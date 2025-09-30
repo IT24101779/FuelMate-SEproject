@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Timeslot Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, button { padding: 8px; font-size: 14px; }
+        #result { margin-top: 20px; padding: 15px; border: 1px solid #ddd; background: #f9f9f9; }
+        .error { color: red; }
+        .success { color: green; }
+        .time-slot {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            border: 1px solid #007bff;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .time-slot:hover { background: #007bff; color: white; }
+        .time-slot.selected { background: #007bff; color: white; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Simple Timeslot API Test</h1>
+
+    <div class="form-group">
+        <label for="testDate">Select Date:</label>
+        <input type="date" id="testDate">
+        <button onclick="testTimeslotAPI()">Load Time Slots</button>
+    </div>
+
+    <div id="result">Select a date and click "Load Time Slots" to test the API</div>
+
+    <div class="form-group">
+        <button onclick="testDirectAPI()">Test API Directly</button>
+        <button onclick="checkConsole()">Check Console</button>
+    </div>
+</div>
+
+<script>
+    // Set today as default
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('testDate').value = today;
+        console.log('Page loaded, today is:', today);
+    });
+
+    function testTimeslotAPI() {
+        console.log('=== TESTING TIMESLOT API ===');
+
+        const dateInput = document.getElementById('testDate');
+        const resultDiv = document.getElementById('result');
+        const selectedDate = dateInput.value;
+
+        console.log('Selected date:', selectedDate);
+
+        if (!selectedDate) {
+            resultDiv.innerHTML = '<div class="error">Please select a date first</div>';
+            return;
+        }
+
+        resultDiv.innerHTML = '<div>Loading time slots...</div>';
+
+        const apiUrl = `/service-bookings/api/available-timeslots?date=${selectedDate}`;
+        console.log('Calling API URL:', apiUrl);
+
+        fetch(apiUrl)
+            .then(response => {
+                console.log('Response received:', response);
+                console.log('Response status:', response.status);
+                console.log('Response ok:', response.ok);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('API data received:', data);
+                displayResults(data);
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            });
+    }
+
+    function displayResults(data) {
+        const resultDiv = document.getElementById('result');
+
+        if (data.success) {
+            let html = '<div class="success">API call successful!</div>';
+
+            if (data.availableSlots && data.availableSlots.length > 0) {
+                html += '<h3>Available Time Slots:</h3>';
+                html += '<div>';
+                data.availableSlots.forEach(slot => {
+                    html += `<span class="time-slot" onclick="selectSlot('${slot}')">${slot}</span>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<div>No available time slots for this date</div>';
+            }
+
+            if (data.occupiedSlots && data.occupiedSlots.length > 0) {
+                html += '<h3>Occupied Slots:</h3>';
+                html += '<div>' + data.occupiedSlots.join(', ') + '</div>';
+            }
+
+            if (data.businessHours) {
+                html += '<h3>Business Hours:</h3>';
+                html += '<div>' + JSON.stringify(data.businessHours) + '</div>';
+            }
+
+            resultDiv.innerHTML = html;
+        } else {
+            resultDiv.innerHTML = `<div class="error">API returned error: ${data.message}</div>`;
+        }
+    }
+
+    function selectSlot(time) {
+        console.log('Selected time slot:', time);
+
+        // Remove previous selection
+        document.querySelectorAll('.time-slot.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+
+        // Add selection to clicked slot
+        event.target.classList.add('selected');
+
+        alert(`You selected time slot: ${time}`);
+    }
+
+    function testDirectAPI() {
+        const testDate = '2024-12-01'; // Fixed test date
+        const url = `/service-bookings/api/available-timeslots?date=${testDate}`;
+        console.log('Testing direct API call:', url);
+        window.open(url, '_blank');
+    }
+
+    function checkConsole() {
+        console.log('=== CONSOLE CHECK ===');
+        console.log('Current URL:', window.location.href);
+        console.log('Date input value:', document.getElementById('testDate').value);
+        console.log('Fetch function available:', typeof fetch !== 'undefined');
+
+        // Test if we can make any API call
+        fetch('/service-bookings/api/test')
+            .then(response => response.json())
+            .then(data => console.log('Test API response:', data))
+            .catch(error => console.error('Test API error:', error));
+    }
+</script>
+</body>
+</html>

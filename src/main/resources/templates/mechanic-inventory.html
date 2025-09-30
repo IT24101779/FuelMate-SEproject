@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">Spare Parts Inventory - FuelMate</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+
+        .sidebar {
+            background: var(--primary-color);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 56px;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 5px;
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .sidebar .nav-link i {
+            width: 24px;
+            margin-right: 10px;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 76px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .navbar-custom {
+            background: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .inventory-table th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-in-stock {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-low-stock {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-out-of-stock {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .category-badge {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+        }
+
+        .type-badge {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+        }
+
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .mechanic-view {
+            border-left: 4px solid var(--success-color);
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+    <div class="container-fluid">
+        <button class="btn btn-link text-white" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a class="navbar-brand fw-bold ms-3" href="#">
+            <i class="fas fa-tools me-2"></i>FuelMate Mechanic
+        </a>
+
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-1"></i>
+                    <span th:text="${session.userName}">Mechanic</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" th:href="@{/mechanic/dashboard}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" th:href="@{/logout}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Sidebar -->
+<div class="sidebar" style="width: 250px;">
+    <div class="px-3 py-4">
+        <h5 class="text-center mb-4">Mechanic Panel</h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/mechanic/dashboard}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" th:href="@{/mechanic/inventory}">
+                    <i class="fas fa-boxes"></i> Spare Parts
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-list-check"></i> My Tasks
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-car"></i> Vehicle Services
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-clock"></i> Schedule
+                </a>
+            </li>
+        </ul>
+
+        <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+
+        <h6 class="text-uppercase fw-bold mt-4 mb-3">Quick Actions</h6>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/mechanic/inventory/low-stock}">
+                    <i class="fas fa-exclamation-triangle me-2"></i> Low Stock Items
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-clipboard-list me-2"></i> Request Parts
+                </a>
+            </li>
+        </ul>
+
+        <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+
+        <h6 class="text-uppercase fw-bold mt-4 mb-3">Inventory Stats</h6>
+        <div class="text-white small">
+            <div class="d-flex justify-content-between mb-2">
+                <span>Total Items:</span>
+                <span th:text="${inventoryItems != null ? inventoryItems.size() : 0}">0</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>Low Stock:</span>
+                <span th:text="${lowStockItems != null ? lowStockItems.size() : 0}">0</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Out of Stock:</span>
+                <span th:text="${inventoryItems != null ? inventoryItems.?[status.toString() == 'OUT_OF_STOCK'].size() : 0}">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Spare Parts Inventory</h2>
+                        <p class="text-muted mb-0">View and monitor spare parts, tools, and consumables</p>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#requestPartsModal">
+                            <i class="fas fa-clipboard-list me-1"></i> Request Parts
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span th:text="${error}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span th:text="${message}">Message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <form th:action="@{/mechanic/inventory/search}" method="get" class="d-flex">
+                    <input type="text" name="searchTerm" class="form-control me-2" placeholder="Search spare parts..." th:value="${searchTerm}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex justify-content-end gap-2">
+                    <a th:href="@{/mechanic/inventory}" class="btn btn-outline-secondary">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </a>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" th:href="@{/mechanic/inventory}">All Items</a></li>
+                            <li><a class="dropdown-item" th:href="@{/mechanic/inventory/low-stock}">Low Stock</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#">Spare Parts Only</a></li>
+                            <li><a class="dropdown-item" href="#">Tools Only</a></li>
+                            <li><a class="dropdown-item" href="#">Consumables Only</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card mechanic-view">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-tools me-2"></i>
+                            Available Spare Parts & Tools
+                            <span class="badge bg-primary ms-2" th:text="${inventoryItems != null ? inventoryItems.size() : 0}">0</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover inventory-table">
+                                <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Min Stock</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${inventoryItems}">
+                                    <td>
+                                        <strong th:text="${item.name}">Item Name</strong>
+                                        <br>
+                                        <small class="text-muted" th:text="${item.description} ?: 'No description'">Description</small>
+                                    </td>
+                                    <td>
+                                        <span class="category-badge" th:text="${item.category}">Category</span>
+                                    </td>
+                                    <td>
+                                        <span class="type-badge" th:text="${item.type}">Type</span>
+                                    </td>
+                                    <td th:text="${item.quantity}">0</td>
+                                    <td th:text="${item.minStockLevel}">0</td>
+                                    <td>
+                                        <span th:classappend="'status-badge status-' + ${item.status.toString().toLowerCase().replace('_', '-')}"
+                                              th:text="${item.status.toString().replace('_', ' ')}">
+                                            Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-info" data-bs-toggle="modal"
+                                                    data-bs-target="#itemDetailsModal"
+                                                    th:data-bs-item-id="${item.id}"
+                                                    th:data-bs-item-name="${item.name}"
+                                                    th:data-bs-item-category="${item.category}"
+                                                    th:data-bs-item-type="${item.type}"
+                                                    th:data-bs-item-quantity="${item.quantity}"
+                                                    th:data-bs-item-minstock="${item.minStockLevel}"
+                                                    th:data-bs-item-price="${item.unitPrice}"
+                                                    th:data-bs-item-description="${item.description}"
+                                                    th:data-bs-item-supplier="${item.supplier}"
+                                                    th:data-bs-item-status="${item.status}">
+                                                <i class="fas fa-eye"></i> View
+                                            </button>
+                                            <button class="btn btn-outline-warning" data-bs-toggle="modal"
+                                                    data-bs-target="#requestItemModal"
+                                                    th:data-bs-item-id="${item.id}"
+                                                    th:data-bs-item-name="${item.name}">
+                                                <i class="fas fa-clipboard-list"></i> Request
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(inventoryItems)}">
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="fas fa-box-open fa-2x mb-3"></i>
+                                        <h5>No spare parts found</h5>
+                                        <p>No spare parts, tools, or consumables available in inventory</p>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Stock Alert Section -->
+        <div class="row mt-4" th:if="${not #lists.isEmpty(lowStockItems) and !(showLowStock != null and showLowStock)}">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i> Low Stock Alert
+                            <span class="badge bg-white text-warning ms-2" th:text="${lowStockItems.size()}">0</span>
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>Category</th>
+                                    <th>Current Stock</th>
+                                    <th>Minimum Required</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${lowStockItems}">
+                                    <td th:text="${item.name}">Item Name</td>
+                                    <td>
+                                        <span class="category-badge" th:text="${item.category}">Category</span>
+                                    </td>
+                                    <td th:text="${item.quantity}">0</td>
+                                    <td th:text="${item.minStockLevel}">0</td>
+                                    <td>
+                                        <span class="status-badge status-low-stock" th:text="${item.status.toString().replace('_', ' ')}">
+                                            LOW STOCK
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-warning" data-bs-toggle="modal"
+                                                data-bs-target="#requestItemModal"
+                                                th:data-bs-item-id="${item.id}"
+                                                th:data-bs-item-name="${item.name}">
+                                            <i class="fas fa-clipboard-list me-1"></i> Request
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Item Details Modal -->
+<div class="modal fade" id="itemDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Item Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Name:</strong>
+                        <p id="detailName" class="mb-1"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Category:</strong>
+                        <p id="detailCategory" class="mb-1"></p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Type:</strong>
+                        <p id="detailType" class="mb-1"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Status:</strong>
+                        <p id="detailStatus" class="mb-1"></p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Quantity:</strong>
+                        <p id="detailQuantity" class="mb-1"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Min Stock Level:</strong>
+                        <p id="detailMinStock" class="mb-1"></p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Unit Price:</strong>
+                        <p id="detailPrice" class="mb-1"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Supplier:</strong>
+                        <p id="detailSupplier" class="mb-1"></p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <strong>Description:</strong>
+                    <p id="detailDescription" class="mb-0 text-muted"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#requestItemModal">
+                    <i class="fas fa-clipboard-list me-1"></i> Request This Item
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Request Item Modal -->
+<div class="modal fade" id="requestItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Request Parts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/mechanic/request-parts}" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="requestItemId" name="itemId">
+                    <div class="mb-3">
+                        <label class="form-label">Item:</label>
+                        <p class="fw-bold" id="requestItemName"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="requestQuantity" class="form-label">Quantity Needed *</label>
+                        <input type="number" class="form-control" id="requestQuantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="requestUrgency" class="form-label">Urgency *</label>
+                        <select class="form-select" id="requestUrgency" name="urgency" required>
+                            <option value="">Select Urgency</option>
+                            <option value="LOW">Low - Within 2 weeks</option>
+                            <option value="MEDIUM">Medium - Within 1 week</option>
+                            <option value="HIGH">High - Within 2 days</option>
+                            <option value="CRITICAL">Critical - Immediately needed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="requestNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="requestNotes" name="notes" rows="3" placeholder="Why do you need these parts? For which vehicle/service?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Request Parts Modal -->
+<div class="modal fade" id="requestPartsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Request New Parts</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/mechanic/request-parts}" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="newItemName" class="form-label">Item Name *</label>
+                        <input type="text" class="form-control" id="newItemName" name="itemName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemCategory" class="form-label">Category *</label>
+                        <select class="form-select" id="newItemCategory" name="category" required>
+                            <option value="">Select Category</option>
+                            <option value="Spare Parts">Spare Parts</option>
+                            <option value="Tools">Tools</option>
+                            <option value="Consumables">Consumables</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemQuantity" class="form-label">Quantity Needed *</label>
+                        <input type="number" class="form-control" id="newItemQuantity" name="quantity" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemUrgency" class="form-label">Urgency *</label>
+                        <select class="form-select" id="newItemUrgency" name="urgency" required>
+                            <option value="">Select Urgency</option>
+                            <option value="LOW">Low - Within 2 weeks</option>
+                            <option value="MEDIUM">Medium - Within 1 week</option>
+                            <option value="HIGH">High - Within 2 days</option>
+                            <option value="CRITICAL">Critical - Immediately needed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="newItemNotes" name="notes" rows="3" placeholder="Why do you need these parts? For which vehicle/service?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Toggle sidebar
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+
+        if (sidebar.style.width === '250px') {
+            sidebar.style.width = '0';
+            mainContent.style.marginLeft = '0';
+        } else {
+            sidebar.style.width = '250px';
+            mainContent.style.marginLeft = '250px';
+        }
+    });
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+
+    // Item Details Modal
+    const itemDetailsModal = document.getElementById('itemDetailsModal');
+    if (itemDetailsModal) {
+        itemDetailsModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const itemName = button.getAttribute('data-bs-item-name');
+            const itemCategory = button.getAttribute('data-bs-item-category');
+            const itemType = button.getAttribute('data-bs-item-type');
+            const itemQuantity = button.getAttribute('data-bs-item-quantity');
+            const itemMinStock = button.getAttribute('data-bs-item-minstock');
+            const itemPrice = button.getAttribute('data-bs-item-price');
+            const itemDescription = button.getAttribute('data-bs-item-description');
+            const itemSupplier = button.getAttribute('data-bs-item-supplier');
+            const itemStatus = button.getAttribute('data-bs-item-status');
+
+            const modal = this;
+            modal.querySelector('#detailName').textContent = itemName || 'N/A';
+            modal.querySelector('#detailCategory').textContent = itemCategory || 'N/A';
+            modal.querySelector('#detailType').textContent = itemType || 'N/A';
+            modal.querySelector('#detailQuantity').textContent = itemQuantity || '0';
+            modal.querySelector('#detailMinStock').textContent = itemMinStock || '0';
+            modal.querySelector('#detailPrice').textContent = itemPrice ? '$' + parseFloat(itemPrice).toFixed(2) : '$0.00';
+            modal.querySelector('#detailSupplier').textContent = itemSupplier || 'N/A';
+            modal.querySelector('#detailStatus').textContent = itemStatus ? itemStatus.replace('_', ' ') : 'N/A';
+            modal.querySelector('#detailDescription').textContent = itemDescription || 'No description available';
+
+            // Set item ID for request button
+            const itemId = button.getAttribute('data-bs-item-id');
+            const requestBtn = modal.querySelector('.btn-primary');
+            requestBtn.setAttribute('data-bs-item-id', itemId);
+            requestBtn.setAttribute('data-bs-item-name', itemName);
+        });
+    }
+
+    // Request Item Modal
+    const requestItemModal = document.getElementById('requestItemModal');
+    if (requestItemModal) {
+        requestItemModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const itemId = button.getAttribute('data-bs-item-id');
+            const itemName = button.getAttribute('data-bs-item-name');
+
+            const modal = this;
+            modal.querySelector('#requestItemId').value = itemId;
+            modal.querySelector('#requestItemName').textContent = itemName;
+        });
+    }
+
+    // Form validation
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(event) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+
+            if (!isValid) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const firstInvalid = form.querySelector('.is-invalid');
+                if (firstInvalid) {
+                    firstInvalid.focus();
+                }
+            }
+        });
+    });
+
+    // Remove invalid class when user starts typing
+    document.querySelectorAll('input, select, textarea').forEach(field => {
+        field.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+</script>
+</body>
+</html>

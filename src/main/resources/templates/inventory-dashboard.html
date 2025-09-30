@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">Inventory Management - FuelMate</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+
+        .sidebar {
+            background: var(--primary-color);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 56px;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 5px;
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .sidebar .nav-link i {
+            width: 24px;
+            margin-right: 10px;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 76px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .navbar-custom {
+            background: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .inventory-table th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-in-stock {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-low-stock {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-out-of-stock {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .category-badge {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+        }
+
+        .type-badge {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+        }
+
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+    <div class="container-fluid">
+        <button class="btn btn-link text-white" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a class="navbar-brand fw-bold ms-3" href="#">
+            <i class="fas fa-boxes me-2"></i>FuelMate Inventory
+        </a>
+
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-1"></i>
+                    <span th:text="${session.userName}">User</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" th:href="@{/admin/dashboard}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" th:href="@{/logout}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Sidebar -->
+<div class="sidebar" style="width: 250px;">
+    <div class="px-3 py-4">
+        <h5 class="text-center mb-4">Inventory Management</h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/admin/dashboard}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" th:href="@{/inventory}">
+                    <i class="fas fa-boxes"></i> All Items
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/inventory/low-stock}">
+                    <i class="fas fa-exclamation-triangle"></i> Low Stock
+                </a>
+            </li>
+        </ul>
+
+        <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+
+        <h6 class="text-uppercase fw-bold mt-4 mb-3">Categories</h6>
+        <ul class="nav flex-column">
+            <li class="nav-item" th:each="category : ${categories}">
+                <a class="nav-link" th:href="@{'/inventory/category/' + ${category}}">
+                    <i class="fas fa-folder me-2"></i>
+                    <span th:text="${category}">Category</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2>Inventory Management</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                        <i class="fas fa-plus me-1"></i> Add New Item
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span th:text="${error}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span th:text="${message}">Message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <form th:action="@{/inventory/search}" method="get" class="d-flex">
+                    <input type="text" name="searchTerm" class="form-control me-2" placeholder="Search inventory items..." th:value="${searchTerm}">
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
+            </div>
+            <div class="col-md-4">
+                <div class="d-flex justify-content-end">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" th:href="@{/inventory}">All Items</a></li>
+                            <li><a class="dropdown-item" th:href="@{/inventory/low-stock}">Low Stock</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li th:each="category : ${categories}">
+                                <a class="dropdown-item" th:href="@{'/inventory/category/' + ${category}}">
+                                    <span th:text="${category}">Category</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover inventory-table">
+                                <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th>Quantity</th>
+                                    <th>Min Stock</th>
+                                    <th>Unit Price</th>
+                                    <th>Total Value</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${inventoryItems}">
+                                    <td>
+                                        <strong th:text="${item.name}">Item Name</strong>
+                                        <br>
+                                        <small class="text-muted" th:text="${item.description} ?: 'No description'">Description</small>
+                                    </td>
+                                    <td>
+                                        <span class="category-badge" th:text="${item.category}">Category</span>
+                                    </td>
+                                    <td>
+                                        <span class="type-badge" th:text="${item.type}">Type</span>
+                                    </td>
+                                    <td th:text="${item.quantity}">0</td>
+                                    <td th:text="${item.minStockLevel}">0</td>
+                                    <td th:text="'$' + ${#numbers.formatDecimal(item.unitPrice, 1, 2)}">$0.00</td>
+                                    <td th:text="'$' + ${#numbers.formatDecimal(item.totalValue, 1, 2)}">$0.00</td>
+                                    <td>
+                                        <span th:classappend="'status-badge status-' + ${item.status.toString().toLowerCase().replace('_', '-')}"
+                                              th:text="${item.status.toString().replace('_', ' ')}">
+                                            Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" data-bs-toggle="modal"
+                                                    data-bs-target="#editItemModal"
+                                                    th:data-bs-item-id="${item.id}"
+                                                    th:data-bs-item-name="${item.name}"
+                                                    th:data-bs-item-category="${item.category}"
+                                                    th:data-bs-item-type="${item.type}"
+                                                    th:data-bs-item-quantity="${item.quantity}"
+                                                    th:data-bs-item-minstock="${item.minStockLevel}"
+                                                    th:data-bs-item-price="${item.unitPrice}"
+                                                    th:data-bs-item-description="${item.description}"
+                                                    th:data-bs-item-supplier="${item.supplier}">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-outline-success" data-bs-toggle="modal"
+                                                    data-bs-target="#adjustQuantityModal"
+                                                    th:data-bs-item-id="${item.id}"
+                                                    th:data-bs-item-name="${item.name}">
+                                                <i class="fas fa-plus-minus"></i>
+                                            </button>
+                                            <form th:action="@{'/inventory/delete/' + ${item.id}}" method="post" class="d-inline">
+                                                <input type="hidden" name="_method" value="delete"/>
+                                                <button type="submit" class="btn btn-outline-danger"
+                                                        onclick="return confirm('Are you sure you want to delete this item?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(inventoryItems)}">
+                                    <td colspan="9" class="text-center text-muted py-4">
+                                        <i class="fas fa-box-open fa-2x mb-3"></i>
+                                        <h5>No inventory items found</h5>
+                                        <p>Add your first inventory item to get started</p>
+                                        <button class="btn btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                                            <i class="fas fa-plus me-1"></i> Add First Item
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Low Stock Alert Section -->
+        <div class="row mt-4" th:if="${not #lists.isEmpty(lowStockItems) and !(showLowStock != null and showLowStock)}">
+            <div class="col-12">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i> Low Stock Alert
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>Category</th>
+                                    <th>Current Stock</th>
+                                    <th>Minimum Required</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="item : ${lowStockItems}">
+                                    <td th:text="${item.name}">Item Name</td>
+                                    <td>
+                                        <span class="category-badge" th:text="${item.category}">Category</span>
+                                    </td>
+                                    <td th:text="${item.quantity}">0</td>
+                                    <td th:text="${item.minStockLevel}">0</td>
+                                    <td>
+                                        <span class="status-badge status-low-stock" th:text="${item.status.toString().replace('_', ' ')}">
+                                            LOW STOCK
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                                                data-bs-target="#adjustQuantityModal"
+                                                th:data-bs-item-id="${item.id}"
+                                                th:data-bs-item-name="${item.name}">
+                                            Restock
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Inventory Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/inventory/add}" method="post" th:object="${inventoryItemDTO}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Item Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" th:field="*{name}" required>
+                        <div class="form-text">Enter the name of the inventory item</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category *</label>
+                        <input type="text" class="form-control" id="category" name="category" th:field="*{category}" required>
+                        <div class="form-text">e.g., Fuel, Spare Parts, Tools, Consumables</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Type *</label>
+                        <select class="form-select" id="type" name="type" th:field="*{type}" required>
+                            <option value="">Select Type</option>
+                            <option value="GENERAL">General</option>
+                            <option value="FUEL">Fuel</option>
+                            <option value="SPARE_PART">Spare Part</option>
+                            <option value="TOOL">Tool</option>
+                            <option value="CONSUMABLE">Consumable</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="quantity" class="form-label">Quantity *</label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" th:field="*{quantity}" min="0" value="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="minStockLevel" class="form-label">Min Stock Level *</label>
+                            <input type="number" class="form-control" id="minStockLevel" name="minStockLevel" th:field="*{minStockLevel}" min="0" value="5" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="unitPrice" class="form-label">Unit Price ($) *</label>
+                        <input type="number" step="0.01" class="form-control" id="unitPrice" name="unitPrice" th:field="*{unitPrice}" min="0" value="0.00" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" th:field="*{description}" rows="2" placeholder="Optional description of the item"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="supplier" class="form-label">Supplier</label>
+                        <input type="text" class="form-control" id="supplier" name="supplier" th:field="*{supplier}" placeholder="Optional supplier information">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Inventory Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editItemForm" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="editItemId" name="id">
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Item Name *</label>
+                        <input type="text" class="form-control" id="editName" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editCategory" class="form-label">Category *</label>
+                        <input type="text" class="form-control" id="editCategory" name="category" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editType" class="form-label">Type *</label>
+                        <select class="form-select" id="editType" name="type" required>
+                            <option value="GENERAL">General</option>
+                            <option value="FUEL">Fuel</option>
+                            <option value="SPARE_PART">Spare Part</option>
+                            <option value="TOOL">Tool</option>
+                            <option value="CONSUMABLE">Consumable</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editQuantity" class="form-label">Quantity *</label>
+                            <input type="number" class="form-control" id="editQuantity" name="quantity" min="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editMinStockLevel" class="form-label">Min Stock Level *</label>
+                            <input type="number" class="form-control" id="editMinStockLevel" name="minStockLevel" min="0" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editUnitPrice" class="form-label">Unit Price ($) *</label>
+                        <input type="number" step="0.01" class="form-control" id="editUnitPrice" name="unitPrice" min="0" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editDescription" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editSupplier" class="form-label">Supplier</label>
+                        <input type="text" class="form-control" id="editSupplier" name="supplier">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Adjust Quantity Modal -->
+<div class="modal fade" id="adjustQuantityModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adjust Quantity</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="adjustQuantityForm" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="adjustItemId" name="id">
+                    <div class="mb-3">
+                        <label class="form-label">Item:</label>
+                        <p class="fw-bold" id="adjustItemName"></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantityChange" class="form-label">Quantity Change *</label>
+                        <input type="number" class="form-control" id="quantityChange" name="quantityChange" required>
+                        <div class="form-text">Enter positive number to add stock, negative number to remove stock</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Reason</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="2" placeholder="Optional reason for quantity adjustment"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Adjust Quantity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    // Toggle sidebar
+    document.getElementById('sidebarToggle').addEventListener('click', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+
+        if (sidebar.style.width === '250px') {
+            sidebar.style.width = '0';
+            mainContent.style.marginLeft = '0';
+        } else {
+            sidebar.style.width = '250px';
+            mainContent.style.marginLeft = '250px';
+        }
+    });
+
+    // Auto-dismiss alerts after 5 seconds
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+
+    // Edit Item Modal
+    const editItemModal = document.getElementById('editItemModal');
+    if (editItemModal) {
+        editItemModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const itemId = button.getAttribute('data-bs-item-id');
+            const itemName = button.getAttribute('data-bs-item-name');
+            const itemCategory = button.getAttribute('data-bs-item-category');
+            const itemType = button.getAttribute('data-bs-item-type');
+            const itemQuantity = button.getAttribute('data-bs-item-quantity');
+            const itemMinStock = button.getAttribute('data-bs-item-minstock');
+            const itemPrice = button.getAttribute('data-bs-item-price');
+            const itemDescription = button.getAttribute('data-bs-item-description');
+            const itemSupplier = button.getAttribute('data-bs-item-supplier');
+
+            const modal = this;
+            modal.querySelector('#editItemId').value = itemId;
+            modal.querySelector('#editName').value = itemName;
+            modal.querySelector('#editCategory').value = itemCategory;
+            modal.querySelector('#editType').value = itemType || 'GENERAL';
+            modal.querySelector('#editQuantity').value = itemQuantity;
+            modal.querySelector('#editMinStockLevel').value = itemMinStock;
+            modal.querySelector('#editUnitPrice').value = itemPrice;
+            modal.querySelector('#editDescription').value = itemDescription || '';
+            modal.querySelector('#editSupplier').value = itemSupplier || '';
+
+            // Update form action
+            const form = modal.querySelector('#editItemForm');
+            form.action = `/inventory/update/${itemId}`;
+        });
+    }
+
+    // Adjust Quantity Modal
+    const adjustQuantityModal = document.getElementById('adjustQuantityModal');
+    if (adjustQuantityModal) {
+        adjustQuantityModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const itemId = button.getAttribute('data-bs-item-id');
+            const itemName = button.getAttribute('data-bs-item-name');
+
+            const modal = this;
+            modal.querySelector('#adjustItemId').value = itemId;
+            modal.querySelector('#adjustItemName').textContent = itemName;
+
+            // Update form action
+            const form = modal.querySelector('#adjustQuantityForm');
+            form.action = `/inventory/adjust-quantity/${itemId}`;
+        });
+    }
+
+    // Form validation for modals
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(event) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+
+            if (!isValid) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                // Show alert for first invalid field
+                const firstInvalid = form.querySelector('.is-invalid');
+                if (firstInvalid) {
+                    firstInvalid.focus();
+                }
+            }
+        });
+    });
+
+    // Remove invalid class when user starts typing
+    document.querySelectorAll('input, select, textarea').forEach(field => {
+        field.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+
+    // Handle delete confirmation
+    document.querySelectorAll('form[action*="delete"]').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (!confirm('Are you sure you want to delete this item? This action cannot be undone.')) {
+                e.preventDefault();
+            }
+        });
+    });
+</script>
+</body>
+</html>

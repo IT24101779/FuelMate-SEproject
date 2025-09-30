@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle}">My Bookings - FuelMate</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root {
+        --primary-color: #2c3e50;
+        --secondary-color: #3498db;
+        --accent-color: #e74c3c;
+        --success-color: #27ae60;
+        --warning-color: #f39c12;
+    }
+    .sidebar {
+        background: var(--primary-color);
+        color: white;
+        height: 100vh;
+        position: fixed;
+        padding-top: 56px;
+    }
+    .sidebar .nav-link {
+        color: rgba(255, 255, 255, 0.8);
+        padding: 12px 20px;
+        margin: 4px 0;
+        border-radius: 5px;
+    }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+    .sidebar .nav-link i {
+        width: 24px;
+        margin-right: 10px;
+    }
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+        padding-top: 76px;
+    }
+    .navbar-custom {
+        background: var(--primary-color);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .booking-card {
+        border-left: 4px solid var(--secondary-color);
+        transition: all 0.3s ease;
+    }
+    .booking-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .booking-card.pending { border-left-color: var(--warning-color); }
+    .booking-card.confirmed { border-left-color: var(--secondary-color); }
+    .booking-card.in-progress { border-left-color: #007bff; }
+    .booking-card.completed { border-left-color: var(--success-color); }
+    .booking-card.cancelled { border-left-color: var(--accent-color); }
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .status-pending { background-color: #fff3cd; color: #856404; }
+    .status-confirmed { background-color: #d1ecf1; color: #0c5460; }
+    .status-assigned { background-color: #cff4fc; color: #055160; }
+    .status-in-progress { background-color: #cce5ff; color: #0056b3; }
+    .status-completed { background-color: #d4edda; color: #155724; }
+    .status-cancelled { background-color: #f8d7da; color: #721c24; }
+    .status-no-show { background-color: #e9ecef; color: #495057; }
+    .priority-badge {
+        padding: 3px 8px;
+        border-radius: 15px;
+        font-size: 0.75rem;
+    }
+    .priority-low { background-color: #e9ecef; color: #495057; }
+    .priority-medium { background-color: #fff3cd; color: #856404; }
+    .priority-high { background-color: #ffeaa7; color: #d63031; }
+    .priority-urgent { background-color: #fab1a0; color: #e17055; }
+    .time-slot-container {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        margin-top: 10px;
+    }
+    .time-slot {
+        display: inline-block;
+        margin: 3px;
+        padding: 8px 15px;
+        border: 2px solid #dee2e6;
+        border-radius: 5px;
+        background-color: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+    .time-slot:hover:not(.occupied) {
+        background-color: var(--secondary-color);
+        color: white;
+        border-color: var(--secondary-color);
+        transform: scale(1.05);
+    }
+    .time-slot.selected {
+        background-color: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    .time-slot.occupied {
+        background-color: #e9ecef;
+        color: #6c757d;
+        cursor: not-allowed;
+        text-decoration: line-through;
+        opacity: 0.6;
+    }
+    .loading-message {
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+        padding: 20px;
+    }
+    .business-hours-info {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-top: 10px;
+        padding: 8px;
+        background-color: #e7f3ff;
+        border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+  <div class="container-fluid">
+    <button class="btn btn-link text-white" id="sidebarToggle">
+      <i class="fas fa-bars"></i>
+    </button>
+    <a class="navbar-brand fw-bold ms-3" href="#">
+      <i class="fas fa-user me-2"></i>FuelMate Customer
+    </a>
+    <div class="navbar-nav ms-auto">
+      <div class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+          <i class="fas fa-user-circle me-1"></i>
+          <span th:text="${session.userName}">Customer</span>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" th:href="@{/customer/dashboard}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" th:href="@{/logout}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="sidebar" style="width: 250px;">
+  <div class="px-3 py-4">
+    <h5 class="text-center mb-4">Customer Panel</h5>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link" th:href="@{/customer/dashboard}">
+          <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" th:href="@{/service-bookings/customer/my-bookings}">
+          <i class="fas fa-calendar-check"></i> My Bookings
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">
+          <i class="fas fa-history"></i> Service History
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#">
+          <i class="fas fa-car"></i> My Vehicles
+        </a>
+      </li>
+    </ul>
+    <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+    <h6 class="text-uppercase fw-bold mt-4 mb-3">Quick Actions</h6>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <button class="nav-link text-start border-0 bg-transparent w-100"
+                data-bs-toggle="modal" data-bs-target="#newBookingModal">
+          <i class="fas fa-plus-circle me-2"></i> New Booking
+        </button>
+      </li>
+    </ul>
+    <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+    <h6 class="text-uppercase fw-bold mt-4 mb-3">My Statistics</h6>
+    <div class="text-white small">
+      <div class="d-flex justify-content-between mb-2">
+        <span>Total Bookings:</span>
+        <span th:text="${serviceBookings != null ? serviceBookings.size() : 0}">0</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span>Pending:</span>
+        <span th:text="${serviceBookings != null ? serviceBookings.?[status.toString() == 'PENDING'].size() : 0}">0</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2">
+        <span>Completed:</span>
+        <span th:text="${serviceBookings != null ? serviceBookings.?[status.toString() == 'COMPLETED'].size() : 0}">0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h2>My Service Bookings</h2>
+            <p class="text-muted mb-0">Track and manage your vehicle service appointments</p>
+          </div>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newBookingModal">
+            <i class="fas fa-plus me-1"></i> New Booking
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+      <i class="fas fa-exclamation-circle me-2"></i>
+      <span th:text="${error}">Error message</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+      <i class="fas fa-check-circle me-2"></i>
+      <span th:text="${message}">Message</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <div class="row">
+      <div th:each="booking : ${serviceBookings}" class="col-lg-6 col-xl-4 mb-4">
+        <div class="card booking-card h-100" th:classappend="${booking.status.name().toLowerCase().replace('_', '-')}">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">
+              <i class="fas fa-calendar-check me-1"></i>
+              Booking <span th:text="'#' + ${booking.id}">#123</span>
+            </h6>
+            <span th:classappend="'status-badge status-' + ${booking.status.name().toLowerCase().replace('_', '-')}"
+                  th:text="${booking.statusDisplayName}">Status</span>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <h6 class="text-primary mb-1">
+                <i class="fas fa-wrench me-1"></i>
+                <span th:text="${booking.serviceType}">Service Type</span>
+              </h6>
+              <div class="d-flex align-items-center">
+                <span th:classappend="'priority-badge priority-' + ${booking.priority.name().toLowerCase()}"
+                      th:text="${booking.priorityDisplayName}">Priority</span>
+              </div>
+            </div>
+            <div class="mb-3">
+              <h6 class="mb-1">
+                <i class="fas fa-car me-1"></i>
+                <span th:text="${booking.vehicleNumber}">Vehicle Number</span>
+              </h6>
+              <p class="text-muted mb-0 small" th:text="${booking.vehicleFullName}">Vehicle Details</p>
+            </div>
+            <div class="mb-3">
+              <h6 class="mb-1">
+                <i class="fas fa-calendar me-1"></i>
+                Scheduled
+              </h6>
+              <p class="mb-0">
+                <strong th:text="${#temporals.format(booking.scheduledDateTime, 'MMM dd, yyyy')}">Date</strong>
+                at <strong th:text="${#temporals.format(booking.scheduledDateTime, 'HH:mm')}">Time</strong>
+              </p>
+              <small class="text-muted" th:if="${booking.estimatedDuration != null}">
+                <i class="fas fa-clock"></i> <span th:text="${booking.estimatedDuration} + ' minutes'">Duration</span>
+              </small>
+            </div>
+            <div class="mb-3" th:if="${booking.mechanic != null}">
+              <h6 class="mb-1">
+                <i class="fas fa-user-cog me-1"></i>
+                Assigned Mechanic
+              </h6>
+              <p class="mb-0" th:text="${booking.mechanic.fullName}">Mechanic Name</p>
+            </div>
+            <div class="mb-3" th:if="${booking.estimatedCost != null and booking.estimatedCost > 0}">
+              <h6 class="mb-1">
+                <i class="fas fa-dollar-sign me-1"></i>
+                Estimated Cost
+              </h6>
+              <p class="mb-0 text-success fw-bold" th:text="'$' + ${#numbers.formatDecimal(booking.estimatedCost, 1, 2)}">$0.00</p>
+            </div>
+            <div th:if="${booking.description != null and not #strings.isEmpty(booking.description)}">
+              <h6 class="mb-1">
+                <i class="fas fa-info-circle me-1"></i>
+                Description
+              </h6>
+              <p class="text-muted small mb-0" th:text="${booking.description}">Service description</p>
+            </div>
+          </div>
+          <div class="card-footer bg-transparent">
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                      data-bs-target="#viewBookingModal"
+                      th:attr="data-booking-id=${booking.id},
+                                           data-vehicle-number=${booking.vehicleNumber},
+                                           data-vehicle-details=${booking.formattedVehicle},
+                                           data-service-type=${booking.serviceType},
+                                           data-scheduled-datetime=${#temporals.format(booking.scheduledDateTime, 'MMM dd, yyyy HH:mm')},
+                                           data-mechanic=${booking.mechanic?.fullName ?: 'Not assigned'},
+                                           data-priority=${booking.priorityDisplayName},
+                                           data-status=${booking.statusDisplayName},
+                                           data-estimated-cost=${booking.estimatedCost},
+                                           data-actual-cost=${booking.actualCost},
+                                           data-estimated-duration=${booking.estimatedDuration},
+                                           data-description=${booking.description},
+                                           data-customer-notes=${booking.customerNotes},
+                                           data-mechanic-notes=${booking.mechanicNotes},
+                                           data-completion-notes=${booking.completionNotes}">
+                <i class="fas fa-eye"></i> View
+              </button>
+              <button class="btn btn-outline-warning btn-sm"
+                      th:if="${booking.status.name() == 'PENDING'}"
+                      data-bs-toggle="modal" data-bs-target="#editBookingModal"
+                      th:attr="data-booking-id=${booking.id},
+                                           data-vehicle-number=${booking.vehicleNumber},
+                                           data-vehicle-make=${booking.vehicleMake},
+                                           data-vehicle-model=${booking.vehicleModel},
+                                           data-vehicle-year=${booking.vehicleYear},
+                                           data-service-type=${booking.serviceType},
+                                           data-scheduled-date=${#temporals.format(booking.scheduledDateTime, 'yyyy-MM-dd')},
+                                           data-scheduled-time=${#temporals.format(booking.scheduledDateTime, 'HH:mm')},
+                                           data-estimated-duration=${booking.estimatedDuration},
+                                           data-estimated-cost=${booking.estimatedCost},
+                                           data-priority=${booking.priority},
+                                           data-description=${booking.description},
+                                           data-customer-notes=${booking.customerNotes}">
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <form th:if="${booking.status.name() == 'PENDING'}"
+                    th:action="@{'/service-bookings/customer/delete/' + ${booking.id}}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('Are you sure you want to cancel this booking?')">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div th:if="${#lists.isEmpty(serviceBookings)}" class="col-12">
+        <div class="card text-center py-5">
+          <div class="card-body">
+            <i class="fas fa-calendar-times fa-4x text-muted mb-4"></i>
+            <h3>No Service Bookings Yet</h3>
+            <p class="text-muted mb-4">You haven't made any service bookings. Book your first service to get started!</p>
+            <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#newBookingModal">
+              <i class="fas fa-plus me-2"></i> Create Your First Booking
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="newBookingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Book New Service</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form th:action="@{/service-bookings/add}" method="post" th:object="${serviceBookingDTO}">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="vehicleNumber" class="form-label">Vehicle Number *</label>
+              <input type="text" class="form-control" id="vehicleNumber" name="vehicleNumber"
+                     th:field="*{vehicleNumber}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="vehicleMake" class="form-label">Vehicle Make *</label>
+              <input type="text" class="form-control" id="vehicleMake" name="vehicleMake"
+                     th:field="*{vehicleMake}" required>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="vehicleModel" class="form-label">Vehicle Model *</label>
+              <input type="text" class="form-control" id="vehicleModel" name="vehicleModel"
+                     th:field="*{vehicleModel}" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="vehicleYear" class="form-label">Vehicle Year</label>
+              <input type="number" class="form-control" id="vehicleYear" name="vehicleYear"
+                     th:field="*{vehicleYear}" min="1990" max="2026">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="serviceType" class="form-label">Service Type *</label>
+              <select class="form-select" id="serviceType" name="serviceType" th:field="*{serviceType}" required>
+                <option value="">Select Service Type</option>
+                <option value="Oil Change">Oil Change</option>
+                <option value="Brake Service">Brake Service</option>
+                <option value="Tire Rotation">Tire Rotation</option>
+                <option value="Engine Tune-up">Engine Tune-up</option>
+                <option value="Transmission Service">Transmission Service</option>
+                <option value="Air Conditioning Service">Air Conditioning Service</option>
+                <option value="Battery Replacement">Battery Replacement</option>
+                <option value="General Inspection">General Inspection</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="priority" class="form-label">Priority</label>
+              <select class="form-select" id="priority" name="priority" th:field="*{priority}">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM" selected>Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label for="scheduledDate" class="form-label">Preferred Date *</label>
+              <input type="date" class="form-control" id="scheduledDate" name="scheduledDate"
+                     th:field="*{scheduledDate}" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Available Time Slots *</label>
+            <div id="timeSlotMessage" class="loading-message">Please select a date to see available time slots</div>
+            <div id="timeSlotContainer" class="time-slot-container d-none"></div>
+            <div id="businessHoursInfo" class="business-hours-info d-none"></div>
+            <input type="hidden" id="scheduledTime" name="scheduledTime" th:field="*{scheduledTime}" required>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Service Description</label>
+            <textarea class="form-control" id="description" name="description" th:field="*{description}"
+                      rows="3" placeholder="Please describe what service you need or any issues with your vehicle..."></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="customerNotes" class="form-label">Special Instructions</label>
+            <textarea class="form-control" id="customerNotes" name="customerNotes" th:field="*{customerNotes}"
+                      rows="2" placeholder="Any special requests or instructions for the service..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitBooking" disabled>Book Service</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editBookingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Service Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editBookingForm" method="post">
+        <div class="modal-body">
+          <input type="hidden" id="editBookingId" name="id">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="editVehicleNumber" class="form-label">Vehicle Number *</label>
+              <input type="text" class="form-control" id="editVehicleNumber" name="vehicleNumber" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editVehicleMake" class="form-label">Vehicle Make *</label>
+              <input type="text" class="form-control" id="editVehicleMake" name="vehicleMake" required>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="editVehicleModel" class="form-label">Vehicle Model *</label>
+              <input type="text" class="form-control" id="editVehicleModel" name="vehicleModel" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editVehicleYear" class="form-label">Vehicle Year</label>
+              <input type="number" class="form-control" id="editVehicleYear" name="vehicleYear" min="1990" max="2026">
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="editServiceType" class="form-label">Service Type *</label>
+              <select class="form-select" id="editServiceType" name="serviceType" required>
+                <option value="Oil Change">Oil Change</option>
+                <option value="Brake Service">Brake Service</option>
+                <option value="Tire Rotation">Tire Rotation</option>
+                <option value="Engine Tune-up">Engine Tune-up</option>
+                <option value="Transmission Service">Transmission Service</option>
+                <option value="Air Conditioning Service">Air Conditioning Service</option>
+                <option value="Battery Replacement">Battery Replacement</option>
+                <option value="General Inspection">General Inspection</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editPriority" class="form-label">Priority</label>
+              <select class="form-select" id="editPriority" name="priority">
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label for="editScheduledDate" class="form-label">Scheduled Date *</label>
+              <input type="date" class="form-control" id="editScheduledDate" name="scheduledDate" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Available Time Slots *</label>
+            <div id="editTimeSlotMessage" class="loading-message">Please select a date to see available time slots</div>
+            <div id="editTimeSlotContainer" class="time-slot-container d-none"></div>
+            <div id="editBusinessHoursInfo" class="business-hours-info d-none"></div>
+            <input type="hidden" id="editScheduledTime" name="scheduledTime" required>
+          </div>
+          <div class="mb-3">
+            <label for="editDescription" class="form-label">Service Description</label>
+            <textarea class="form-control" id="editDescription" name="description" rows="3"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="editCustomerNotes" class="form-label">Special Instructions</label>
+            <textarea class="form-control" id="editCustomerNotes" name="customerNotes" rows="2"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitEditBooking" disabled>Update Booking</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="viewBookingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Booking Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-md-6">
+            <h6>Booking Information</h6>
+            <table class="table table-borderless table-sm">
+              <tr><td><strong>Booking ID:</strong></td><td id="viewBookingId"></td></tr>
+              <tr><td><strong>Status:</strong></td><td id="viewStatus"></td></tr>
+              <tr><td><strong>Priority:</strong></td><td id="viewPriority"></td></tr>
+              <tr><td><strong>Scheduled:</strong></td><td id="viewScheduledDateTime"></td></tr>
+              <tr><td><strong>Duration:</strong></td><td id="viewEstimatedDuration"></td></tr>
+            </table>
+          </div>
+          <div class="col-md-6">
+            <h6>Vehicle & Service</h6>
+            <table class="table table-borderless table-sm">
+              <tr><td><strong>Vehicle:</strong></td><td id="viewVehicleDetails"></td></tr>
+              <tr><td><strong>Service Type:</strong></td><td id="viewServiceType"></td></tr>
+              <tr><td><strong>Mechanic:</strong></td><td id="viewMechanic"></td></tr>
+              <tr><td><strong>Estimated Cost:</strong></td><td id="viewEstimatedCost"></td></tr>
+              <tr><td><strong>Actual Cost:</strong></td><td id="viewActualCost"></td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="row mt-3" id="viewDescription" style="display:none;">
+          <div class="col-12"><h6>Service Description</h6><p class="text-muted" id="viewDescriptionText"></p></div>
+        </div>
+        <div class="row" id="viewCustomerNotes" style="display:none;">
+          <div class="col-12"><h6>Your Notes</h6><p class="text-muted" id="viewCustomerNotesText"></p></div>
+        </div>
+        <div class="row" id="viewMechanicNotes" style="display:none;">
+          <div class="col-12"><h6>Mechanic Notes</h6><p class="text-muted" id="viewMechanicNotesText"></p></div>
+        </div>
+        <div class="row" id="viewCompletionNotes" style="display:none;">
+          <div class="col-12"><h6>Service Completion Notes</h6><p class="text-muted" id="viewCompletionNotesText"></p></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+  console.log('Script loaded');
+
+  let currentBookingId = null;
+
+  document.addEventListener('DOMContentLoaded', function() {
+      console.log('DOM loaded');
+
+      // Sidebar toggle
+      document.getElementById('sidebarToggle')?.addEventListener('click', function() {
+          const sidebar = document.querySelector('.sidebar');
+          const mainContent = document.querySelector('.main-content');
+          if (sidebar && mainContent) {
+              if (sidebar.style.width === '250px' || !sidebar.style.width) {
+                  sidebar.style.width = '0';
+                  mainContent.style.marginLeft = '0';
+              } else {
+                  sidebar.style.width = '250px';
+                  mainContent.style.marginLeft = '250px';
+              }
+          }
+      });
+
+      // Auto-dismiss alerts
+      setTimeout(function() {
+          const alerts = document.querySelectorAll('.alert');
+          alerts.forEach(alert => {
+              const bsAlert = new bootstrap.Alert(alert);
+              bsAlert.close();
+          });
+      }, 5000);
+
+      // Set min date
+      const today = new Date().toISOString().split('T')[0];
+      document.querySelectorAll('input[type="date"]').forEach(input => {
+          input.min = today;
+      });
+
+      // New booking date listener
+      const newDate = document.getElementById('scheduledDate');
+      if (newDate) {
+          newDate.addEventListener('change', function() {
+              console.log('Date selected:', this.value);
+              if (this.value) {
+                  loadSlots(this.value, 'new');
+              }
+          });
+      }
+
+      // EDIT booking date listener
+      const editDate = document.getElementById('editScheduledDate');
+      if (editDate) {
+          editDate.addEventListener('change', function() {
+              console.log('Edit date selected:', this.value);
+              if (this.value) {
+                  loadSlots(this.value, 'edit', currentBookingId);
+              }
+          });
+      }
+
+      // ✅ FIX: View Booking Modal
+      const viewBookingModal = document.getElementById('viewBookingModal');
+      if (viewBookingModal) {
+          viewBookingModal.addEventListener('show.bs.modal', function(event) {
+              const button = event.relatedTarget;
+
+              console.log('=== VIEW MODAL OPENED ===');
+              console.log('Button:', button);
+              console.log('Booking ID:', button.getAttribute('data-booking-id'));
+
+              // Basic information
+              const bookingId = button.getAttribute('data-booking-id');
+              const status = button.getAttribute('data-status');
+              const priority = button.getAttribute('data-priority');
+              const scheduledDateTime = button.getAttribute('data-scheduled-datetime');
+              const estimatedDuration = button.getAttribute('data-estimated-duration');
+
+              // Vehicle & Service
+              const vehicleDetails = button.getAttribute('data-vehicle-details');
+              const serviceType = button.getAttribute('data-service-type');
+              const mechanic = button.getAttribute('data-mechanic');
+              const estimatedCost = button.getAttribute('data-estimated-cost');
+              const actualCost = button.getAttribute('data-actual-cost');
+
+              // Notes
+              const description = button.getAttribute('data-description');
+              const customerNotes = button.getAttribute('data-customer-notes');
+              const mechanicNotes = button.getAttribute('data-mechanic-notes');
+              const completionNotes = button.getAttribute('data-completion-notes');
+
+              // Populate basic info
+              document.getElementById('viewBookingId').textContent = bookingId ? '#' + bookingId : 'N/A';
+              document.getElementById('viewStatus').textContent = status || 'N/A';
+              document.getElementById('viewPriority').textContent = priority || 'N/A';
+              document.getElementById('viewScheduledDateTime').textContent = scheduledDateTime || 'N/A';
+
+              // Duration
+              if (estimatedDuration && estimatedDuration !== 'null') {
+                  document.getElementById('viewEstimatedDuration').textContent = estimatedDuration + ' minutes';
+              } else {
+                  document.getElementById('viewEstimatedDuration').textContent = 'Not specified';
+              }
+
+              // Vehicle & Service
+              document.getElementById('viewVehicleDetails').textContent = vehicleDetails || 'N/A';
+              document.getElementById('viewServiceType').textContent = serviceType || 'N/A';
+              document.getElementById('viewMechanic').textContent = mechanic || 'Not assigned';
+
+              // Costs
+              if (estimatedCost && estimatedCost !== 'null' && parseFloat(estimatedCost) > 0) {
+                  document.getElementById('viewEstimatedCost').textContent = '$' + parseFloat(estimatedCost).toFixed(2);
+              } else {
+                  document.getElementById('viewEstimatedCost').textContent = 'Not specified';
+              }
+
+              if (actualCost && actualCost !== 'null' && parseFloat(actualCost) > 0) {
+                  document.getElementById('viewActualCost').textContent = '$' + parseFloat(actualCost).toFixed(2);
+              } else {
+                  document.getElementById('viewActualCost').textContent = 'Not finalized';
+              }
+
+              // Handle optional sections
+              const descriptionSection = document.getElementById('viewDescription');
+              if (description && description !== 'null' && description.trim()) {
+                  document.getElementById('viewDescriptionText').textContent = description;
+                  descriptionSection.style.display = 'block';
+              } else {
+                  descriptionSection.style.display = 'none';
+              }
+
+              const customerNotesSection = document.getElementById('viewCustomerNotes');
+              if (customerNotes && customerNotes !== 'null' && customerNotes.trim()) {
+                  document.getElementById('viewCustomerNotesText').textContent = customerNotes;
+                  customerNotesSection.style.display = 'block';
+              } else {
+                  customerNotesSection.style.display = 'none';
+              }
+
+              const mechanicNotesSection = document.getElementById('viewMechanicNotes');
+              if (mechanicNotes && mechanicNotes !== 'null' && mechanicNotes.trim()) {
+                  document.getElementById('viewMechanicNotesText').textContent = mechanicNotes;
+                  mechanicNotesSection.style.display = 'block';
+              } else {
+                  mechanicNotesSection.style.display = 'none';
+              }
+
+              const completionNotesSection = document.getElementById('viewCompletionNotes');
+              if (completionNotes && completionNotes !== 'null' && completionNotes.trim()) {
+                  document.getElementById('viewCompletionNotesText').textContent = completionNotes;
+                  completionNotesSection.style.display = 'block';
+              } else {
+                  completionNotesSection.style.display = 'none';
+              }
+
+              console.log('Modal populated successfully');
+          });
+      }
+
+      // Edit modal listener
+      const editModal = document.getElementById('editBookingModal');
+      if (editModal) {
+          editModal.addEventListener('show.bs.modal', function(event) {
+              const button = event.relatedTarget;
+              const bookingId = button.getAttribute('data-booking-id');
+              currentBookingId = bookingId;
+
+              console.log('Edit modal opened for booking:', bookingId);
+
+              // Populate form
+              document.getElementById('editBookingId').value = bookingId;
+              document.getElementById('editVehicleNumber').value = button.getAttribute('data-vehicle-number') || '';
+              document.getElementById('editVehicleMake').value = button.getAttribute('data-vehicle-make') || '';
+              document.getElementById('editVehicleModel').value = button.getAttribute('data-vehicle-model') || '';
+              document.getElementById('editVehicleYear').value = button.getAttribute('data-vehicle-year') || '';
+              document.getElementById('editServiceType').value = button.getAttribute('data-service-type') || '';
+              document.getElementById('editScheduledDate').value = button.getAttribute('data-scheduled-date') || '';
+              document.getElementById('editPriority').value = button.getAttribute('data-priority') || 'MEDIUM';
+              document.getElementById('editDescription').value = button.getAttribute('data-description') || '';
+              document.getElementById('editCustomerNotes').value = button.getAttribute('data-customer-notes') || '';
+              document.getElementById('editBookingForm').action = `/service-bookings/customer/update/${bookingId}`;
+
+              // Load slots for existing date
+              const existingDate = button.getAttribute('data-scheduled-date');
+              const existingTime = button.getAttribute('data-scheduled-time');
+
+              if (existingDate) {
+                  setTimeout(() => {
+                      loadSlots(existingDate, 'edit', bookingId);
+                      if (existingTime) {
+                          setTimeout(() => {
+                              const slots = document.querySelectorAll('#editTimeSlotContainer .time-slot');
+                              slots.forEach(slot => {
+                                  if (slot.textContent === existingTime) {
+                                      slot.classList.add('selected');
+                                      document.getElementById('editScheduledTime').value = existingTime;
+                                      document.getElementById('submitEditBooking').disabled = false;
+                                  }
+                              });
+                          }, 1000);
+                      }
+                  }, 100);
+              }
+          });
+
+          editModal.addEventListener('hidden.bs.modal', function() {
+              currentBookingId = null;
+              document.getElementById('editScheduledTime').value = '';
+              document.getElementById('submitEditBooking').disabled = true;
+          });
+      }
+
+      // New booking modal reset
+      const newBookingModal = document.getElementById('newBookingModal');
+      if (newBookingModal) {
+          newBookingModal.addEventListener('hidden.bs.modal', function() {
+              document.getElementById('scheduledTime').value = '';
+              document.getElementById('submitBooking').disabled = true;
+          });
+      }
+  });
+
+  function loadSlots(date, type, excludeId = null) {
+      console.log('loadSlots called:', date, type, 'exclude:', excludeId);
+
+      const container = document.getElementById(type === 'edit' ? 'editTimeSlotContainer' : 'timeSlotContainer');
+      const message = document.getElementById(type === 'edit' ? 'editTimeSlotMessage' : 'timeSlotMessage');
+      const btn = document.getElementById(type === 'edit' ? 'submitEditBooking' : 'submitBooking');
+
+      if (!container || !message) {
+          console.error('Elements not found');
+          return;
+      }
+
+      message.textContent = 'Loading...';
+      message.classList.remove('d-none');
+      container.classList.add('d-none');
+      if (btn) btn.disabled = true;
+
+      let url = `/service-bookings/api/available-timeslots?date=${date}`;
+      if (excludeId) {
+          url += `&excludeBookingId=${excludeId}`;
+      }
+
+      console.log('Fetching:', url);
+
+      fetch(url)
+          .then(r => {
+              console.log('Response:', r.status);
+              return r.json();
+          })
+          .then(data => {
+              console.log('Data:', data);
+
+              if (!data.success || !data.availableSlots || data.availableSlots.length === 0) {
+                  message.textContent = data.message || 'No slots available';
+                  return;
+              }
+
+              message.classList.add('d-none');
+              container.classList.remove('d-none');
+              container.innerHTML = '';
+
+              data.availableSlots.forEach(slot => {
+                  const span = document.createElement('span');
+                  span.className = 'time-slot';
+                  span.textContent = slot;
+                  span.onclick = function() {
+                      container.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
+                      this.classList.add('selected');
+                      document.getElementById(type === 'edit' ? 'editScheduledTime' : 'scheduledTime').value = slot;
+                      if (btn) btn.disabled = false;
+                      console.log('Selected:', slot);
+                  };
+                  container.appendChild(span);
+              });
+
+              // Show occupied slots
+              if (data.occupiedSlots && data.occupiedSlots.length > 0) {
+                  data.occupiedSlots.forEach(slot => {
+                      const span = document.createElement('span');
+                      span.className = 'time-slot occupied';
+                      span.textContent = slot;
+                      span.title = 'Already booked';
+                      container.appendChild(span);
+                  });
+              }
+          })
+          .catch(err => {
+              console.error('Error:', err);
+              message.textContent = 'Error loading slots';
+          });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Booking Test</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .time-slot {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            border: 1px solid #007bff;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .time-slot:hover {
+            background: #007bff;
+            color: white;
+        }
+        .time-slot.selected {
+            background: #007bff;
+            color: white;
+        }
+        .time-slot.occupied {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        .time-slot-container {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2>Minimal Booking Test</h2>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Book Service Test</h5>
+        </div>
+        <div class="card-body">
+            <form id="bookingForm" action="/service-bookings/add" method="post">
+                <div class="mb-3">
+                    <label for="vehicleNumber" class="form-label">Vehicle Number *</label>
+                    <input type="text" class="form-control" id="vehicleNumber" name="vehicleNumber" value="TEST-123" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="vehicleMake" class="form-label">Vehicle Make *</label>
+                    <input type="text" class="form-control" id="vehicleMake" name="vehicleMake" value="Toyota" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="vehicleModel" class="form-label">Vehicle Model *</label>
+                    <input type="text" class="form-control" id="vehicleModel" name="vehicleModel" value="Camry" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="serviceType" class="form-label">Service Type *</label>
+                    <select class="form-select" id="serviceType" name="serviceType" required>
+                        <option value="">Select Service Type</option>
+                        <option value="Oil Change">Oil Change</option>
+                        <option value="Brake Service">Brake Service</option>
+                        <option value="General Inspection">General Inspection</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="scheduledDate" class="form-label">Preferred Date *</label>
+                    <input type="date" class="form-control" id="scheduledDate" name="scheduledDate" required>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Available Time Slots *</label>
+                    <div id="loadingMessage">Select a date to see available time slots</div>
+                    <div id="timeSlotsContainer" class="time-slot-container d-none"></div>
+                    <input type="hidden" id="scheduledTime" name="scheduledTime" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Book Service</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Debug Info -->
+    <div class="card mt-4">
+        <div class="card-header">Debug Info</div>
+        <div class="card-body">
+            <div id="debugInfo">Select a date to see debug information</div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    console.log('=== SCRIPT LOADED ===');
+
+    let selectedTime = null;
+
+    // Set minimum date to today
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('scheduledDate').value = today;
+        document.getElementById('scheduledDate').min = today;
+        console.log('DOM loaded, today set to:', today);
+    });
+
+    // Date change handler
+    document.getElementById('scheduledDate').addEventListener('change', function() {
+        const selectedDate = this.value;
+        console.log('=== DATE CHANGED ===');
+        console.log('Selected date:', selectedDate);
+
+        if (selectedDate) {
+            loadTimeSlots(selectedDate);
+        } else {
+            resetTimeSlots();
+        }
+    });
+
+    function loadTimeSlots(date) {
+        console.log('=== LOADING TIME SLOTS ===');
+        console.log('Date:', date);
+
+        const loadingMessage = document.getElementById('loadingMessage');
+        const container = document.getElementById('timeSlotsContainer');
+        const debugInfo = document.getElementById('debugInfo');
+
+        // Show loading
+        loadingMessage.innerHTML = '<i class="spinner-border spinner-border-sm"></i> Loading time slots...';
+        container.classList.add('d-none');
+
+        const url = `/service-bookings/api/available-timeslots?date=${date}`;
+        console.log('API URL:', url);
+
+        debugInfo.innerHTML = `
+            <strong>Debug Info:</strong><br>
+            Date: ${date}<br>
+            API URL: ${url}<br>
+            Status: Making request...
+        `;
+
+        fetch(url)
+            .then(response => {
+                console.log('Response received:', response);
+                console.log('Status:', response.status);
+                console.log('OK:', response.ok);
+
+                debugInfo.innerHTML += `<br>Response Status: ${response.status}`;
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+
+                debugInfo.innerHTML += `<br>API Response: <pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+                if (data.success && data.availableSlots && data.availableSlots.length > 0) {
+                    showTimeSlots(data);
+                } else {
+                    showNoSlots(data.message || 'No slots available');
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+
+                debugInfo.innerHTML += `<br><span class="text-danger">Error: ${error.message}</span>`;
+
+                loadingMessage.innerHTML = `<span class="text-danger">Error loading time slots: ${error.message}</span>`;
+                container.classList.add('d-none');
+            });
+    }
+
+    function showTimeSlots(data) {
+        console.log('=== SHOWING TIME SLOTS ===');
+        console.log('Available slots:', data.availableSlots);
+
+        const loadingMessage = document.getElementById('loadingMessage');
+        const container = document.getElementById('timeSlotsContainer');
+
+        loadingMessage.classList.add('d-none');
+        container.classList.remove('d-none');
+        container.innerHTML = '';
+
+        // Add available slots
+        data.availableSlots.forEach(slot => {
+            const slotElement = document.createElement('span');
+            slotElement.className = 'time-slot';
+            slotElement.textContent = slot;
+            slotElement.onclick = () => selectTimeSlot(slot, slotElement);
+            container.appendChild(slotElement);
+        });
+
+        // Add occupied slots if any
+        if (data.occupiedSlots && data.occupiedSlots.length > 0) {
+            data.occupiedSlots.forEach(slot => {
+                const slotElement = document.createElement('span');
+                slotElement.className = 'time-slot occupied';
+                slotElement.textContent = slot;
+                slotElement.title = 'Already booked';
+                container.appendChild(slotElement);
+            });
+        }
+
+        console.log('Time slots displayed successfully');
+    }
+
+    function showNoSlots(message) {
+        const loadingMessage = document.getElementById('loadingMessage');
+        const container = document.getElementById('timeSlotsContainer');
+
+        loadingMessage.innerHTML = message;
+        container.classList.add('d-none');
+    }
+
+    function selectTimeSlot(time, element) {
+        console.log('=== TIME SLOT SELECTED ===');
+        console.log('Time:', time);
+
+        // Remove previous selection
+        document.querySelectorAll('.time-slot.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+
+        // Select this slot
+        element.classList.add('selected');
+        selectedTime = time;
+
+        // Update form
+        document.getElementById('scheduledTime').value = time;
+        document.getElementById('submitBtn').disabled = false;
+
+        console.log('Time slot selected:', time);
+    }
+
+    function resetTimeSlots() {
+        document.getElementById('loadingMessage').innerHTML = 'Select a date to see available time slots';
+        document.getElementById('timeSlotsContainer').classList.add('d-none');
+        document.getElementById('scheduledTime').value = '';
+        document.getElementById('submitBtn').disabled = true;
+        selectedTime = null;
+    }
+
+    // Form submission
+    document.getElementById('bookingForm').addEventListener('submit', function(e) {
+        console.log('=== FORM SUBMISSION ===');
+        console.log('Selected time:', selectedTime);
+        console.log('Form data:', new FormData(this));
+
+        if (!selectedTime) {
+            e.preventDefault();
+            alert('Please select a time slot');
+            return false;
+        }
+
+        // Let the form submit normally
+        return true;
+    });
+</script>
+</body>
+</html>

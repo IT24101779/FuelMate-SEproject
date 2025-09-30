@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">My Tasks - FuelMate</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+
+        .sidebar {
+            background: var(--primary-color);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 56px;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 5px;
+        }
+
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .sidebar .nav-link i {
+            width: 24px;
+            margin-right: 10px;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 76px;
+        }
+
+        .navbar-custom {
+            background: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-card {
+            border-left: 4px solid var(--secondary-color);
+            transition: all 0.3s ease;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .task-card.high-priority {
+            border-left-color: var(--accent-color);
+        }
+
+        .task-card.urgent-priority {
+            border-left-color: #d63031;
+        }
+
+        .task-card.in-progress {
+            border-left-color: #007bff;
+        }
+
+        .task-card.completed {
+            border-left-color: var(--success-color);
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-confirmed { background-color: #d1ecf1; color: #0c5460; }
+        .status-assigned { background-color: #cff4fc; color: #055160; }
+        .status-in-progress { background-color: #cce5ff; color: #0056b3; }
+        .status-completed { background-color: #d4edda; color: #155724; }
+        .status-cancelled { background-color: #f8d7da; color: #721c24; }
+
+        .priority-badge {
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+        }
+
+        .priority-low { background-color: #e9ecef; color: #495057; }
+        .priority-medium { background-color: #fff3cd; color: #856404; }
+        .priority-high { background-color: #ffeaa7; color: #d63031; }
+        .priority-urgent { background-color: #fab1a0; color: #e17055; }
+
+        .mechanic-view {
+            border-left: 4px solid var(--success-color);
+        }
+    </style>
+</head>
+<body>
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+    <div class="container-fluid">
+        <button class="btn btn-link text-white" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a class="navbar-brand fw-bold ms-3" href="#">
+            <i class="fas fa-tools me-2"></i>FuelMate Mechanic
+        </a>
+
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-1"></i>
+                    <span th:text="${session.userName}">Mechanic</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" th:href="@{/mechanic/dashboard}"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" th:href="@{/logout}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- Sidebar -->
+<div class="sidebar" style="width: 250px;">
+    <div class="px-3 py-4">
+        <h5 class="text-center mb-4">Mechanic Panel</h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/mechanic/dashboard}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link active" th:href="@{/service-bookings/mechanic/my-tasks}">
+                    <i class="fas fa-list-check"></i> My Tasks
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/mechanic/inventory}">
+                    <i class="fas fa-boxes"></i> Spare Parts
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-car"></i> Vehicle Services
+                </a>
+            </li>
+        </ul>
+
+        <hr class="my-4" style="border-color: rgba(255,255,255,0.2);">
+
+        <h6 class="text-uppercase fw-bold mt-4 mb-3">Task Statistics</h6>
+        <div class="text-white small">
+            <div class="d-flex justify-content-between mb-2">
+                <span>Assigned Tasks:</span>
+                <span th:text="${serviceBookings != null ? serviceBookings.size() : 0}">0</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>In Progress:</span>
+                <span th:text="${serviceBookings != null ? serviceBookings.?[status.toString() == 'IN_PROGRESS'].size() : 0}">0</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Completed Today:</span>
+                <span th:text="${serviceBookings != null ? serviceBookings.?[status.toString() == 'COMPLETED'].size() : 0}">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>My Service Tasks</h2>
+                        <p class="text-muted mb-0">Manage your assigned service appointments and tasks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Messages -->
+        <div th:if="${error}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span th:text="${error}">Error message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <div th:if="${message}" class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span th:text="${message}">Message</span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Tasks Grid -->
+        <div class="row">
+            <!-- Assigned Tasks -->
+            <div class="col-12 mb-4">
+                <h4><i class="fas fa-tasks me-2"></i>My Assigned Tasks</h4>
+                <div class="row">
+                    <div th:each="booking : ${serviceBookings}" class="col-lg-6 col-xl-4 mb-4">
+                        <div class="card task-card h-100"
+                             th:classappend="${booking.priority.name().toLowerCase() + '-priority ' + booking.status.name().toLowerCase().replace('_', '-')}">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-calendar-check me-1"></i>
+                                    Task <span th:text="'#' + ${booking.id}">#123</span>
+                                </h6>
+                                <span th:classappend="'status-badge status-' + ${booking.status.name().toLowerCase().replace('_', '-')}"
+                                      th:text="${booking.statusDisplayName}">Status</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <h6 class="text-primary mb-1">
+                                        <i class="fas fa-wrench me-1"></i>
+                                        <span th:text="${booking.serviceType}">Service Type</span>
+                                    </h6>
+                                    <div class="d-flex align-items-center">
+                                        <span th:classappend="'priority-badge priority-' + ${booking.priority.name().toLowerCase()}"
+                                              th:text="${booking.priorityDisplayName}">Priority</span>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-user me-1"></i>
+                                        Customer
+                                    </h6>
+                                    <p class="mb-0" th:text="${booking.customer.fullName}">Customer Name</p>
+                                    <small class="text-muted" th:text="${booking.customer.email}">customer@email.com</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-car me-1"></i>
+                                        Vehicle
+                                    </h6>
+                                    <p class="mb-0"><strong th:text="${booking.vehicleNumber}">Vehicle Number</strong></p>
+                                    <small class="text-muted" th:text="${booking.vehicleFullName}">Vehicle Details</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-calendar me-1"></i>
+                                        Scheduled
+                                    </h6>
+                                    <p class="mb-0">
+                                        <strong th:text="${#temporals.format(booking.scheduledDateTime, 'MMM dd, yyyy')}">Date</strong>
+                                        at <strong th:text="${#temporals.format(booking.scheduledDateTime, 'HH:mm')}">Time</strong>
+                                    </p>
+                                    <small class="text-muted" th:if="${booking.estimatedDuration != null}">
+                                        <i class="fas fa-clock"></i> <span th:text="${booking.estimatedDuration} + ' minutes'">Duration</span>
+                                    </small>
+                                </div>
+
+                                <div th:if="${booking.description != null and not #strings.isEmpty(booking.description)}" class="mb-3">
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Description
+                                    </h6>
+                                    <p class="text-muted small mb-0" th:text="${booking.description}">Service description</p>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal"
+                                            data-bs-target="#viewTaskModal"
+                                            th:attr="data-booking-id=${booking.id},
+                                                   data-customer-name=${booking.customer.fullName},
+                                                   data-customer-email=${booking.customer.email},
+                                                   data-vehicle-number=${booking.vehicleNumber},
+                                                   data-vehicle-details=${booking.formattedVehicle},
+                                                   data-service-type=${booking.serviceType},
+                                                   data-scheduled-datetime=${#temporals.format(booking.scheduledDateTime, 'MMM dd, yyyy HH:mm')},
+                                                   data-priority=${booking.priorityDisplayName},
+                                                   data-status=${booking.statusDisplayName},
+                                                   data-estimated-cost=${booking.estimatedCost},
+                                                   data-estimated-duration=${booking.estimatedDuration},
+                                                   data-description=${booking.description},
+                                                   data-customer-notes=${booking.customerNotes},
+                                                   data-mechanic-notes=${booking.mechanicNotes}">
+                                        <i class="fas fa-eye"></i> View
+                                    </button>
+
+                                    <form th:if="${booking.status.name() == 'ASSIGNED'}"
+                                          th:action="@{'/service-bookings/update-status/' + ${booking.id}}" method="post" class="d-inline">
+                                        <input type="hidden" name="status" value="IN_PROGRESS"/>
+                                        <button type="submit" class="btn btn-success btn-sm">
+                                            <i class="fas fa-play"></i> Start
+                                        </button>
+                                    </form>
+
+                                    <button th:if="${booking.status.name() == 'IN_PROGRESS'}"
+                                            class="btn btn-primary btn-sm" data-bs-toggle="modal"
+                                            data-bs-target="#completeTaskModal"
+                                            th:attr="data-booking-id=${booking.id},
+                                                   data-service-type=${booking.serviceType},
+                                                   data-vehicle=${booking.formattedVehicle}">
+                                        <i class="fas fa-check-double"></i> Complete
+                                    </button>
+
+                                    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal"
+                                            data-bs-target="#addNotesModal"
+                                            th:attr="data-booking-id=${booking.id},
+                                                   data-service-type=${booking.serviceType},
+                                                   data-existing-notes=${booking.mechanicNotes}">
+                                        <i class="fas fa-sticky-note"></i> Notes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State for My Tasks -->
+                    <div th:if="${#lists.isEmpty(serviceBookings)}" class="col-12">
+                        <div class="card text-center py-5">
+                            <div class="card-body">
+                                <i class="fas fa-clipboard-list fa-4x text-muted mb-4"></i>
+                                <h3>No Assigned Tasks</h3>
+                                <p class="text-muted mb-0">You don't have any service tasks assigned to you at the moment.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Assignments (if available) -->
+            <div class="col-12" th:if="${pendingBookings != null and not #lists.isEmpty(pendingBookings)}">
+                <h4><i class="fas fa-clock me-2"></i>Pending Assignments</h4>
+                <div class="row">
+                    <div th:each="booking : ${pendingBookings}" class="col-lg-6 col-xl-4 mb-4">
+                        <div class="card task-card h-100 pending">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-hourglass-half me-1"></i>
+                                    Booking <span th:text="'#' + ${booking.id}">#123</span>
+                                </h6>
+                                <span class="status-badge status-pending">Pending</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <h6 class="text-warning mb-1">
+                                        <i class="fas fa-wrench me-1"></i>
+                                        <span th:text="${booking.serviceType}">Service Type</span>
+                                    </h6>
+                                    <span th:classappend="'priority-badge priority-' + ${booking.priority.name().toLowerCase()}"
+                                          th:text="${booking.priorityDisplayName}">Priority</span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">Customer</h6>
+                                    <p class="mb-0" th:text="${booking.customer.fullName}">Customer Name</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">Vehicle</h6>
+                                    <p class="mb-0" th:text="${booking.formattedVehicle}">Vehicle Info</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <h6 class="mb-1">Scheduled</h6>
+                                    <p class="mb-0" th:text="${#temporals.format(booking.scheduledDateTime, 'MMM dd, yyyy HH:mm')}">Date Time</p>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-transparent">
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i>
+                                    Waiting for manager to assign a mechanic
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Task Modal -->
+<div class="modal fade" id="viewTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Task Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Task Information</h6>
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <td><strong>Task ID:</strong></td>
+                                <td id="viewTaskId"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Service Type:</strong></td>
+                                <td id="viewTaskServiceType"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Priority:</strong></td>
+                                <td id="viewTaskPriority"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status:</strong></td>
+                                <td id="viewTaskStatus"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Scheduled:</strong></td>
+                                <td id="viewTaskScheduled"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Duration:</strong></td>
+                                <td id="viewTaskDuration"></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Customer & Vehicle</h6>
+                        <table class="table table-borderless table-sm">
+                            <tr>
+                                <td><strong>Customer:</strong></td>
+                                <td id="viewTaskCustomer"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email:</strong></td>
+                                <td id="viewTaskCustomerEmail"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Vehicle:</strong></td>
+                                <td id="viewTaskVehicle"></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Estimated Cost:</strong></td>
+                                <td id="viewTaskCost"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="row mt-3" id="viewTaskDescription">
+                    <div class="col-12">
+                        <h6>Service Description</h6>
+                        <p class="text-muted" id="viewTaskDescriptionText"></p>
+                    </div>
+                </div>
+
+                <div class="row" id="viewTaskCustomerNotes">
+                    <div class="col-12">
+                        <h6>Customer Notes</h6>
+                        <p class="text-muted" id="viewTaskCustomerNotesText"></p>
+                    </div>
+                </div>
+
+                <div class="row" id="viewTaskMechanicNotes">
+                    <div class="col-12">
+                        <h6>My Notes</h6>
+                        <p class="text-muted" id="viewTaskMechanicNotesText"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Task Modal -->
+<div class="modal fade" id="completeTaskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Complete Service</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="completeTaskForm" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="completeTaskId">
+                    <input type="hidden" name="status" value="COMPLETED">
+
+                    <div class="mb-3">
+                        <label class="form-label">Service:</label>
+                        <p class="fw-bold" id="completeTaskInfo"></p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="taskActualCost" class="form-label">Final Cost ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="taskActualCost" name="actualCost" min="0">
+                        <div class="form-text">Enter the final cost for this service</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="taskCompletionNotes" class="form-label">Service Completion Report *</label>
+                        <textarea class="form-control" id="taskCompletionNotes" name="notes" rows="4"
+                                  placeholder="Describe what was done, parts used, any issues found, recommendations for the customer, etc." required></textarea>
+                        <div class="form-text">Provide detailed information about the completed service</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Complete Service</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Notes Modal -->
+<div class="modal fade" id="addNotesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add/Update Notes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addNotesForm" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="notesTaskId">
+
+                    <div class="mb-3">
+                        <label class="form-label">Service:</label>
+                        <p class="fw-bold" id="notesTaskInfo"></p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="mechanicNotes" class="form-label">Mechanic Notes</label>
+                        <textarea class="form-control" id="mechanicNotes" name="mechanicNotes" rows="4"
+                                  placeholder="Add notes about the service progress, issues encountered, parts needed, etc."></textarea>
+                        <div class="form-text">These notes will help track the service progress</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Notes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Toggle sidebar
+    document.getElementById('sidebarToggle')?.addEventListener('click', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        if (sidebar && mainContent) {
+            if (sidebar.style.width === '250px' || !sidebar.style.width) {
+                sidebar.style.width = '0';
+                mainContent.style.marginLeft = '0';
+            } else {
+                sidebar.style.width = '250px';
+                mainContent.style.marginLeft = '250px';
+            }
+        }
+    });
+
+    // Auto-dismiss alerts
+    setTimeout(() => {
+        document.querySelectorAll('.alert').forEach(alert => {
+            try {
+                new bootstrap.Alert(alert).close();
+            } catch(e) {}
+        });
+    }, 5000);
+
+    // View Task Modal
+    const viewTaskModal = document.getElementById('viewTaskModal');
+    if (viewTaskModal) {
+        viewTaskModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('viewTaskId').textContent = '#' + button.getAttribute('data-booking-id');
+            document.getElementById('viewTaskServiceType').textContent = button.getAttribute('data-service-type');
+            document.getElementById('viewTaskPriority').textContent = button.getAttribute('data-priority');
+            document.getElementById('viewTaskStatus').textContent = button.getAttribute('data-status');
+            document.getElementById('viewTaskScheduled').textContent = button.getAttribute('data-scheduled-datetime');
+            document.getElementById('viewTaskCustomer').textContent = button.getAttribute('data-customer-name');
+            document.getElementById('viewTaskCustomerEmail').textContent = button.getAttribute('data-customer-email');
+            document.getElementById('viewTaskVehicle').textContent = button.getAttribute('data-vehicle-details');
+
+            const cost = button.getAttribute('data-estimated-cost');
+            document.getElementById('viewTaskCost').textContent = cost ? '$' + parseFloat(cost).toFixed(2) : 'Not specified';
+
+            const duration = button.getAttribute('data-estimated-duration');
+            document.getElementById('viewTaskDuration').textContent = duration ? duration + ' minutes' : 'Not specified';
+
+            // Handle optional sections
+            const description = button.getAttribute('data-description');
+            if (description && description.trim() && description !== 'null') {
+                document.getElementById('viewTaskDescriptionText').textContent = description;
+                document.getElementById('viewTaskDescription').style.display = 'block';
+            } else {
+                document.getElementById('viewTaskDescription').style.display = 'none';
+            }
+
+            const customerNotes = button.getAttribute('data-customer-notes');
+            if (customerNotes && customerNotes.trim() && customerNotes !== 'null') {
+                document.getElementById('viewTaskCustomerNotesText').textContent = customerNotes;
+                document.getElementById('viewTaskCustomerNotes').style.display = 'block';
+            } else {
+                document.getElementById('viewTaskCustomerNotes').style.display = 'none';
+            }
+
+            const mechanicNotes = button.getAttribute('data-mechanic-notes');
+            if (mechanicNotes && mechanicNotes.trim() && mechanicNotes !== 'null') {
+                document.getElementById('viewTaskMechanicNotesText').textContent = mechanicNotes;
+                document.getElementById('viewTaskMechanicNotes').style.display = 'block';
+            } else {
+                document.getElementById('viewTaskMechanicNotes').style.display = 'none';
+            }
+        });
+    }
+
+    // Complete Task Modal
+    const completeTaskModal = document.getElementById('completeTaskModal');
+    if (completeTaskModal) {
+        completeTaskModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const bookingId = button.getAttribute('data-booking-id');
+            const serviceType = button.getAttribute('data-service-type');
+            const vehicle = button.getAttribute('data-vehicle');
+
+            console.log('Complete task modal opened for booking:', bookingId);
+
+            document.getElementById('completeTaskId').value = bookingId;
+            document.getElementById('completeTaskInfo').textContent = serviceType + ' - ' + vehicle;
+            document.getElementById('completeTaskForm').action = `/service-bookings/update-status/${bookingId}`;
+
+            // Clear previous values
+            document.getElementById('taskActualCost').value = '';
+            document.getElementById('taskCompletionNotes').value = '';
+        });
+    }
+
+    // Add Notes Modal
+    const addNotesModal = document.getElementById('addNotesModal');
+    if (addNotesModal) {
+        addNotesModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const bookingId = button.getAttribute('data-booking-id');
+            const serviceType = button.getAttribute('data-service-type');
+            const existingNotes = button.getAttribute('data-existing-notes');
+
+            console.log('Add notes modal opened for booking:', bookingId);
+
+            document.getElementById('notesTaskId').value = bookingId;
+            document.getElementById('notesTaskInfo').textContent = serviceType;
+            document.getElementById('mechanicNotes').value = existingNotes && existingNotes !== 'null' ? existingNotes : '';
+
+            // CRITICAL FIX: Use the correct endpoint for updating notes
+            document.getElementById('addNotesForm').action = `/service-bookings/update/${bookingId}`;
+        });
+    }
+
+    // Form validation
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(event) {
+            const requiredFields = form.querySelectorAll('[required]');
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                if (!field.value || !field.value.trim()) {
+                    field.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    field.classList.remove('is-invalid');
+                }
+            });
+
+            if (!isValid) {
+                event.preventDefault();
+                event.stopPropagation();
+                alert('Please fill in all required fields');
+            }
+        });
+    });
+
+    // Remove invalid class on input
+    document.querySelectorAll('input, textarea').forEach(field => {
+        field.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+
+    console.log('Mechanic tasks script loaded');
+</script>
+</body>
+</html>

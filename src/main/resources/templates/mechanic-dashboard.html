@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${pageTitle}">Mechanic Dashboard - FuelMate</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+        .sidebar {
+            background: var(--primary-color);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 56px;
+        }
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            margin: 4px 0;
+            border-radius: 5px;
+        }
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        .sidebar .nav-link i {
+            width: 24px;
+            margin-right: 10px;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            padding-top: 76px;
+        }
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+        .navbar-custom {
+            background: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .task-card {
+            border-left: 4px solid var(--secondary-color);
+        }
+        .task-card.high-priority {
+            border-left-color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+    <div class="container-fluid">
+        <button class="btn btn-link text-white" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a class="navbar-brand fw-bold ms-3" href="#">
+            <i class="fas fa-tools me-2"></i>FuelMate Mechanic
+        </a>
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-user-circle me-1"></i>
+                    <span th:text="${session.userName}">Mechanic</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                    <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" th:href="@{/logout}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="sidebar" style="width: 250px;">
+    <div class="px-3 py-4">
+        <h5 class="text-center mb-4">Mechanic Panel</h5>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active" th:href="@{/mechanic/dashboard}">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>
+            <li class="nav-item">
+                <!-- CRITICAL FIX: This link was wrong -->
+                <a class="nav-link" th:href="@{/service-bookings/mechanic/my-tasks}">
+                    <i class="fas fa-list-check"></i> My Tasks
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" th:href="@{/mechanic/inventory}">
+                    <i class="fas fa-boxes"></i> Spare Parts
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-car"></i> Vehicle Services
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="fas fa-clock"></i> Schedule
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-primary">
+                    <h4 class="alert-heading">Welcome, <span th:text="${session.userName}">Mechanic</span>!</h4>
+                    <p class="mb-0">Check your assigned tasks and manage your workload efficiently.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-primary text-white">
+                        <i class="fas fa-list-check"></i>
+                    </div>
+                    <h5 class="card-title">Assigned Tasks</h5>
+                    <h2 class="card-text">8</h2>
+                    <p class="text-muted">Today's workload</p>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-success text-white">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h5 class="card-title">Completed</h5>
+                    <h2 class="card-text">3</h2>
+                    <p class="text-muted">Today's completed tasks</p>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-warning text-white">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h5 class="card-title">In Progress</h5>
+                    <h2 class="card-text">2</h2>
+                    <p class="text-muted">Ongoing tasks</p>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-info text-white">
+                        <i class="fas fa-tools"></i>
+                    </div>
+                    <h5 class="card-title">Parts Needed</h5>
+                    <h2 class="card-text">5</h2>
+                    <p class="text-muted">Items to request</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-8 mb-4">
+                <div class="card">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Quick Overview</h5>
+                        <a th:href="@{/service-bookings/mechanic/my-tasks}" class="btn btn-sm btn-primary">View All Tasks</a>
+                    </div>
+                    <div class="card-body">
+                        <p>You have assigned tasks waiting for you.</p>
+                        <a th:href="@{/service-bookings/mechanic/my-tasks}" class="btn btn-primary">
+                            <i class="fas fa-tasks me-2"></i>Go to My Tasks
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a th:href="@{/service-bookings/mechanic/my-tasks}" class="btn btn-outline-primary">
+                                <i class="fas fa-list-check me-1"></i> View My Tasks
+                            </a>
+                            <a th:href="@{/mechanic/inventory}" class="btn btn-outline-success">
+                                <i class="fas fa-boxes me-1"></i> Check Spare Parts
+                            </a>
+                            <button class="btn btn-outline-info">
+                                <i class="fas fa-clipboard-list me-1"></i> Request Parts
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.getElementById('sidebarToggle')?.addEventListener('click', function() {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        if (sidebar && mainContent) {
+            if (sidebar.style.width === '250px' || !sidebar.style.width) {
+                sidebar.style.width = '0';
+                mainContent.style.marginLeft = '0';
+            } else {
+                sidebar.style.width = '250px';
+                mainContent.style.marginLeft = '250px';
+            }
+        }
+    });
+</script>
+</body>
+</html>
