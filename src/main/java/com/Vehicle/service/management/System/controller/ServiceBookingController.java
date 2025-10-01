@@ -80,6 +80,7 @@ public class ServiceBookingController {
             List<ServiceBooking> upcomingBookings = serviceBookingService.getUpcomingBookings();
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
             List<User> availableMechanics = serviceBookingService.getAvailableMechanics();
+            Map<Long, Long> mechanicWorkload = serviceBookingService.getMechanicWorkloadMap();
 
             model.addAttribute("pageTitle", "Service Booking Management - FuelMate");
             model.addAttribute("serviceBookings", serviceBookings);
@@ -89,6 +90,7 @@ public class ServiceBookingController {
             model.addAttribute("upcomingBookings", upcomingBookings);
             model.addAttribute("serviceTypes", serviceTypes);
             model.addAttribute("availableMechanics", availableMechanics);
+            model.addAttribute("mechanicWorkload", mechanicWorkload);
             model.addAttribute("serviceBookingDTO", new ServiceBookingDTO());
             model.addAttribute("bookingStatuses", BookingStatus.values());
             model.addAttribute("priorities", Priority.values());
@@ -123,8 +125,16 @@ public class ServiceBookingController {
             System.out.println("Creating service booking: " + serviceBookingDTO);
 
             ServiceBooking booking = serviceBookingService.createServiceBooking(serviceBookingDTO, customerId);
-            redirectAttributes.addFlashAttribute("message",
-                    "Service booking created successfully! Booking ID: " + booking.getId());
+
+            if (booking.getMechanic() != null) {
+                redirectAttributes.addFlashAttribute("message",
+                        "Service booking created successfully! Auto-assigned to mechanic: " +
+                                booking.getMechanic().getFullName() + " (Booking ID: " + booking.getId() + ")");
+            } else {
+                redirectAttributes.addFlashAttribute("message",
+                        "Service booking created successfully! Awaiting mechanic assignment (Booking ID: " +
+                                booking.getId() + ")");
+            }
         } catch (Exception e) {
             System.out.println("Error creating booking: " + e.getMessage());
             e.printStackTrace();
@@ -182,39 +192,31 @@ public class ServiceBookingController {
                                         @RequestParam(value = "estimatedDuration", required = false) Integer estimatedDuration,
                                         @RequestParam(value = "estimatedCost", required = false) Double estimatedCost) {
 
-        System.out.println("=== CUSTOMER UPDATE BOOKING ===");
-        System.out.println("Booking ID: " + id);
-        System.out.println("Vehicle: " + vehicleNumber + " " + vehicleMake + " " + vehicleModel);
-
         try {
             User currentUser = (User) session.getAttribute("user");
             if (currentUser == null) {
-                System.out.println("No user in session");
                 return "redirect:/login";
             }
 
             if (currentUser.getRole() != User.UserRole.CUSTOMER) {
-                System.out.println("Non-customer trying to access customer endpoint");
                 redirectAttributes.addFlashAttribute("error", "Access denied.");
                 return "redirect:/service-bookings";
             }
 
             ServiceBooking existingBooking = serviceBookingService.getServiceBookingById(id);
             if (existingBooking == null) {
-                System.out.println("Booking not found: " + id);
                 redirectAttributes.addFlashAttribute("error", "Booking not found.");
                 return "redirect:/service-bookings/customer/my-bookings";
             }
 
             if (!existingBooking.getCustomer().getId().equals(currentUser.getId())) {
-                System.out.println("Booking belongs to different customer");
                 redirectAttributes.addFlashAttribute("error", "You can only edit your own bookings.");
                 return "redirect:/service-bookings/customer/my-bookings";
             }
 
-            if (existingBooking.getStatus() != BookingStatus.PENDING) {
-                System.out.println("Booking status is not PENDING: " + existingBooking.getStatus());
-                redirectAttributes.addFlashAttribute("error", "Only pending bookings can be edited.");
+            if (existingBooking.getStatus() != BookingStatus.PENDING &&
+                    existingBooking.getStatus() != BookingStatus.ASSIGNED) {
+                redirectAttributes.addFlashAttribute("error", "Only pending or assigned bookings can be edited.");
                 return "redirect:/service-bookings/customer/my-bookings";
             }
 
@@ -239,10 +241,7 @@ public class ServiceBookingController {
                 }
             }
 
-            System.out.println("Updating booking...");
-            ServiceBooking updatedBooking = serviceBookingService.updateServiceBooking(id, serviceBookingDTO);
-            System.out.println("Booking updated successfully");
-
+            serviceBookingService.updateServiceBooking(id, serviceBookingDTO);
             redirectAttributes.addFlashAttribute("message", "Your booking has been updated successfully!");
 
         } catch (Exception e) {
@@ -280,12 +279,12 @@ public class ServiceBookingController {
                 return "redirect:/service-bookings/customer/my-bookings";
             }
 
-            if (existingBooking.getStatus() != BookingStatus.PENDING) {
-                redirectAttributes.addFlashAttribute("error", "Only pending bookings can be cancelled.");
+            if (existingBooking.getStatus() != BookingStatus.PENDING &&
+                    existingBooking.getStatus() != BookingStatus.ASSIGNED) {
+                redirectAttributes.addFlashAttribute("error", "Only pending or assigned bookings can be cancelled.");
                 return "redirect:/service-bookings/customer/my-bookings";
             }
 
-            System.out.println("Customer cancelling booking ID: " + id);
             serviceBookingService.deleteServiceBooking(id);
             redirectAttributes.addFlashAttribute("message", "Your booking has been cancelled successfully!");
 
@@ -303,18 +302,26 @@ public class ServiceBookingController {
                                  @RequestParam Long mechanicId,
                                  RedirectAttributes redirectAttributes) {
         try {
-            System.out.println("Assigning mechanic " + mechanicId + " to booking " + id);
+            ServiceBooking existingBooking = serviceBookingService.getServiceBookingById(id);
+            boolean isReassignment = existingBooking != null && existingBooking.getMechanic() != null;
 
             ServiceBooking updatedBooking = serviceBookingService.assignMechanic(id, mechanicId);
-            redirectAttributes.addFlashAttribute("message", "Mechanic assigned successfully!");
+
+            if (isReassignment) {
+                redirectAttributes.addFlashAttribute("message",
+                        "Mechanic reassigned successfully to " + updatedBooking.getMechanic().getFullName() + "!");
+            } else {
+                redirectAttributes.addFlashAttribute("message",
+                        "Mechanic assigned successfully!");
+            }
         } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Failed to assign mechanic: " + e.getMessage());
+            redirectAttributes.addFlashAttribute("error",
+                    "Failed to assign mechanic: " + e.getMessage());
         }
 
         return "redirect:/service-bookings";
     }
 
-    // ✅ UPDATED METHOD - THIS IS THE KEY FIX
     @PostMapping("/update-status/{id}")
     public String updateBookingStatus(@PathVariable("id") Long id,
                                       @RequestParam BookingStatus status,
@@ -323,29 +330,19 @@ public class ServiceBookingController {
                                       RedirectAttributes redirectAttributes,
                                       HttpSession session) {
         try {
-            System.out.println("=== UPDATE BOOKING STATUS ===");
-            System.out.println("Booking ID: " + id);
-            System.out.println("New Status: " + status);
-            System.out.println("Notes: " + (notes != null ? notes : "null"));
-            System.out.println("Actual Cost: " + (actualCost != null ? actualCost : "null"));
-
-            // Update the status first
             ServiceBooking updatedBooking = serviceBookingService.updateBookingStatus(id, status, notes);
 
-            // ✅ FIX: Only update actual cost if provided AND greater than 0
             if (actualCost != null && actualCost > 0 && status == BookingStatus.COMPLETED) {
-                System.out.println("Updating actual cost to: " + actualCost);
                 ServiceBookingDTO updateDTO = new ServiceBookingDTO();
                 updateDTO.setActualCost(actualCost);
                 serviceBookingService.updateServiceBooking(id, updateDTO);
                 redirectAttributes.addFlashAttribute("message",
-                        "Task completed successfully! Final cost: $" + String.format("%.2f", actualCost));
+                        "Task completed successfully! Final cost: Rs." + String.format("%.2f", actualCost));
             } else if (status == BookingStatus.COMPLETED) {
-                // ✅ FIX: Better message when no cost is provided
                 Double finalCost = updatedBooking.getActualCost();
                 if (finalCost != null && finalCost > 0) {
                     redirectAttributes.addFlashAttribute("message",
-                            "Task completed successfully! Cost: $" + String.format("%.2f", finalCost));
+                            "Task completed successfully! Cost: Rs." + String.format("%.2f", finalCost));
                 } else {
                     redirectAttributes.addFlashAttribute("message",
                             "Task completed successfully! Cost will be finalized later.");
@@ -377,7 +374,6 @@ public class ServiceBookingController {
                                        HttpSession session,
                                        RedirectAttributes redirectAttributes) {
         try {
-            System.out.println("Deleting service booking ID: " + id);
             serviceBookingService.deleteServiceBooking(id);
             redirectAttributes.addFlashAttribute("message", "Service booking deleted successfully!");
         } catch (Exception e) {
@@ -398,11 +394,13 @@ public class ServiceBookingController {
             List<ServiceBooking> bookings = serviceBookingService.getBookingsByStatus(bookingStatus);
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
             List<User> availableMechanics = serviceBookingService.getAvailableMechanics();
+            Map<Long, Long> mechanicWorkload = serviceBookingService.getMechanicWorkloadMap();
 
             model.addAttribute("pageTitle", status.replace("_", " ") + " Bookings - FuelMate");
             model.addAttribute("serviceBookings", bookings);
             model.addAttribute("serviceTypes", serviceTypes);
             model.addAttribute("availableMechanics", availableMechanics);
+            model.addAttribute("mechanicWorkload", mechanicWorkload);
             model.addAttribute("selectedStatus", status);
             model.addAttribute("serviceBookingDTO", new ServiceBookingDTO());
             model.addAttribute("bookingStatuses", BookingStatus.values());
@@ -422,11 +420,13 @@ public class ServiceBookingController {
             List<ServiceBooking> pendingBookings = serviceBookingService.getPendingBookings();
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
             List<User> availableMechanics = serviceBookingService.getAvailableMechanics();
+            Map<Long, Long> mechanicWorkload = serviceBookingService.getMechanicWorkloadMap();
 
             model.addAttribute("pageTitle", "Pending Bookings - FuelMate");
             model.addAttribute("serviceBookings", pendingBookings);
             model.addAttribute("serviceTypes", serviceTypes);
             model.addAttribute("availableMechanics", availableMechanics);
+            model.addAttribute("mechanicWorkload", mechanicWorkload);
             model.addAttribute("showPending", true);
             model.addAttribute("serviceBookingDTO", new ServiceBookingDTO());
             model.addAttribute("bookingStatuses", BookingStatus.values());
@@ -446,11 +446,13 @@ public class ServiceBookingController {
             List<ServiceBooking> todaysBookings = serviceBookingService.getTodaysBookings();
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
             List<User> availableMechanics = serviceBookingService.getAvailableMechanics();
+            Map<Long, Long> mechanicWorkload = serviceBookingService.getMechanicWorkloadMap();
 
             model.addAttribute("pageTitle", "Today's Bookings - FuelMate");
             model.addAttribute("serviceBookings", todaysBookings);
             model.addAttribute("serviceTypes", serviceTypes);
             model.addAttribute("availableMechanics", availableMechanics);
+            model.addAttribute("mechanicWorkload", mechanicWorkload);
             model.addAttribute("showToday", true);
             model.addAttribute("serviceBookingDTO", new ServiceBookingDTO());
             model.addAttribute("bookingStatuses", BookingStatus.values());
@@ -479,11 +481,13 @@ public class ServiceBookingController {
             List<ServiceBooking> searchResults = serviceBookingService.searchBookings(searchTerm);
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
             List<User> availableMechanics = serviceBookingService.getAvailableMechanics();
+            Map<Long, Long> mechanicWorkload = serviceBookingService.getMechanicWorkloadMap();
 
             model.addAttribute("pageTitle", "Search Results - FuelMate");
             model.addAttribute("serviceBookings", searchResults);
             model.addAttribute("serviceTypes", serviceTypes);
             model.addAttribute("availableMechanics", availableMechanics);
+            model.addAttribute("mechanicWorkload", mechanicWorkload);
             model.addAttribute("searchTerm", searchTerm);
             model.addAttribute("serviceBookingDTO", new ServiceBookingDTO());
             model.addAttribute("bookingStatuses", BookingStatus.values());
@@ -504,24 +508,16 @@ public class ServiceBookingController {
         try {
             User currentUser = (User) session.getAttribute("user");
 
-            System.out.println("=== CUSTOMER BOOKINGS PAGE ===");
-            System.out.println("User in session: " + (currentUser != null ? currentUser.getEmail() : "null"));
-
             if (currentUser == null) {
-                System.out.println("No user in session, redirecting to login");
                 return "redirect:/login";
             }
 
             if (currentUser.getRole() != User.UserRole.CUSTOMER) {
-                System.out.println("Non-customer user " + currentUser.getRole() + " tried to access customer bookings");
                 return "redirect:/service-bookings";
             }
 
-            System.out.println("Loading customer bookings for: " + currentUser.getEmail());
-
             List<ServiceBooking> customerBookings;
             if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-                System.out.println("Filtering bookings with search term: " + searchTerm);
                 customerBookings = serviceBookingService.getBookingsByCustomer(currentUser).stream()
                         .filter(booking ->
                                 booking.getVehicleNumber().toLowerCase().contains(searchTerm.toLowerCase()) ||
@@ -536,8 +532,6 @@ public class ServiceBookingController {
 
             List<String> serviceTypes = serviceBookingService.getAllServiceTypes();
 
-            System.out.println("Found " + customerBookings.size() + " bookings for customer");
-
             model.addAttribute("pageTitle", "My Bookings - FuelMate");
             model.addAttribute("serviceBookings", customerBookings);
             model.addAttribute("serviceTypes", serviceTypes);
@@ -545,7 +539,6 @@ public class ServiceBookingController {
             model.addAttribute("priorities", Priority.values());
             model.addAttribute("currentUser", currentUser);
 
-            System.out.println("Returning customer-bookings template");
             return "customer-bookings";
 
         } catch (Exception e) {
@@ -590,9 +583,6 @@ public class ServiceBookingController {
             @RequestParam String date,
             @RequestParam(required = false) Long excludeBookingId) {
 
-        System.out.println("=== TIMESLOT API CALLED ===");
-        System.out.println("Date: " + date + ", Exclude: " + excludeBookingId);
-
         try {
             LocalDate selectedDate = LocalDate.parse(date);
 
@@ -620,9 +610,6 @@ public class ServiceBookingController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            System.out.println("Error in timeslot API: " + e.getMessage());
-            e.printStackTrace();
-
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Failed to load time slots");

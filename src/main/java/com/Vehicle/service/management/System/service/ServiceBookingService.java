@@ -15,6 +15,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -34,6 +37,7 @@ public class ServiceBookingService {
         return serviceBookingRepository.findById(id).orElse(null);
     }
 
+    // ✅ ENHANCED: Auto-assign mechanic when customer creates booking
     public ServiceBooking createServiceBooking(ServiceBookingDTO serviceBookingDTO, Long customerId) {
         try {
             User customer = userRepository.findById(customerId).orElse(null);
@@ -63,12 +67,26 @@ public class ServiceBookingService {
             serviceBooking.setServiceType(serviceBookingDTO.getServiceType());
             serviceBooking.setDescription(serviceBookingDTO.getDescription());
             serviceBooking.setScheduledDateTime(scheduledDateTime);
-            serviceBooking.setEstimatedDuration(serviceBookingDTO.getEstimatedDuration());
+            serviceBooking.setEstimatedDuration(serviceBookingDTO.getEstimatedDuration() != null ?
+                    serviceBookingDTO.getEstimatedDuration() : 60);
             serviceBooking.setEstimatedCost(serviceBookingDTO.getEstimatedCost());
             serviceBooking.setPriority(serviceBookingDTO.getPriority() != null ?
                     serviceBookingDTO.getPriority() : Priority.MEDIUM);
             serviceBooking.setCustomerNotes(serviceBookingDTO.getCustomerNotes());
             serviceBooking.setStatus(BookingStatus.PENDING);
+
+            // ✅ AUTO-ASSIGN MECHANIC
+            Integer duration = serviceBooking.getEstimatedDuration();
+            User autoAssignedMechanic = autoAssignMechanicSmart(scheduledDateTime, duration);
+
+            if (autoAssignedMechanic != null) {
+                serviceBooking.setMechanic(autoAssignedMechanic);
+                serviceBooking.setStatus(BookingStatus.ASSIGNED);
+                System.out.println("✅ AUTO-ASSIGNED: Mechanic " + autoAssignedMechanic.getFullName() +
+                        " to booking for " + scheduledDateTime);
+            } else {
+                System.out.println("⚠️ NO MECHANIC AVAILABLE: Booking remains PENDING for manual assignment");
+            }
 
             return serviceBookingRepository.save(serviceBooking);
         } catch (Exception e) {
@@ -145,6 +163,7 @@ public class ServiceBookingService {
         }
     }
 
+    // ✅ ENHANCED: Allow reassignment even if mechanic already assigned
     public ServiceBooking assignMechanic(Long bookingId, Long mechanicId) {
         try {
             ServiceBooking booking = serviceBookingRepository.findById(bookingId).orElse(null);
@@ -157,20 +176,41 @@ public class ServiceBookingService {
                 throw new RuntimeException("Valid mechanic not found");
             }
 
+            // Check for time conflicts
             List<ServiceBooking> conflicts = serviceBookingRepository.findConflictingBookings(
                     mechanic,
                     booking.getScheduledDateTime(),
-                    booking.getScheduledDateTime().plusMinutes(booking.getEstimatedDuration() != null ? booking.getEstimatedDuration() : 60)
+                    booking.getScheduledDateTime().plusMinutes(booking.getEstimatedDuration() != null ?
+                            booking.getEstimatedDuration() : 60)
             );
+
+            // Exclude current booking from conflict check
+            conflicts = conflicts.stream()
+                    .filter(b -> !b.getId().equals(bookingId))
+                    .collect(Collectors.toList());
 
             if (!conflicts.isEmpty()) {
                 throw new RuntimeException("Mechanic has conflicting bookings at this time");
             }
 
+            // Check if reassigning
+            boolean isReassignment = booking.getMechanic() != null &&
+                    !booking.getMechanic().getId().equals(mechanicId);
+
             booking.setMechanic(mechanic);
             booking.setStatus(BookingStatus.ASSIGNED);
 
-            return serviceBookingRepository.save(booking);
+            ServiceBooking savedBooking = serviceBookingRepository.save(booking);
+
+            if (isReassignment) {
+                System.out.println("✅ REASSIGNED: Booking #" + bookingId + " to mechanic " +
+                        mechanic.getFullName());
+            } else {
+                System.out.println("✅ ASSIGNED: Mechanic " + mechanic.getFullName() + " to booking #" +
+                        bookingId);
+            }
+
+            return savedBooking;
         } catch (Exception e) {
             System.out.println("Error assigning mechanic: " + e.getMessage());
             e.printStackTrace();
@@ -178,7 +218,6 @@ public class ServiceBookingService {
         }
     }
 
-    // ✅ FIXED: Better handling of status updates with proper cost management
     public ServiceBooking updateBookingStatus(Long bookingId, BookingStatus status, String notes) {
         try {
             ServiceBooking booking = serviceBookingRepository.findById(bookingId).orElse(null);
@@ -203,7 +242,6 @@ public class ServiceBookingService {
                     if (notes != null && !notes.trim().isEmpty()) {
                         booking.setCompletionNotes(notes);
                     }
-                    // ✅ FIX: Auto-set actual cost to estimated cost if not already set
                     if (booking.getActualCost() == null && booking.getEstimatedCost() != null) {
                         booking.setActualCost(booking.getEstimatedCost());
                         System.out.println("Auto-setting actual cost to estimated cost: " + booking.getEstimatedCost());
@@ -285,7 +323,7 @@ public class ServiceBookingService {
 
     public List<User> getAvailableMechanics() {
         return userRepository.findAll().stream()
-                .filter(user -> user.getRole() == User.UserRole.MECHANIC)
+                .filter(user -> user.getRole() == User.UserRole.MECHANIC && user.isActive())
                 .toList();
     }
 
@@ -302,14 +340,61 @@ public class ServiceBookingService {
         return conflicts.isEmpty();
     }
 
-    public User autoAssignMechanic(LocalDateTime scheduledTime, Integer durationMinutes) {
+    // ✅ NEW: Smart auto-assignment - considers workload and availability
+    public User autoAssignMechanicSmart(LocalDateTime scheduledTime, Integer durationMinutes) {
         List<User> availableMechanics = getAvailableMechanics();
-        for (User mechanic : availableMechanics) {
-            if (isMechanicAvailable(mechanic, scheduledTime, durationMinutes)) {
-                return mechanic;
-            }
+
+        if (availableMechanics.isEmpty()) {
+            System.out.println("⚠️ No mechanics in the system");
+            return null;
         }
-        return null;
+
+        // Get mechanic workload
+        List<Object[]> workloadData = serviceBookingRepository.findMechanicWorkload();
+        Map<Long, Long> workloadMap = workloadData.stream()
+                .collect(Collectors.toMap(
+                        arr -> ((User) arr[0]).getId(),
+                        arr -> (Long) arr[1]
+                ));
+
+        // Filter mechanics available at the scheduled time
+        List<User> availableAtTime = availableMechanics.stream()
+                .filter(mechanic -> isMechanicAvailable(mechanic, scheduledTime, durationMinutes))
+                .collect(Collectors.toList());
+
+        if (availableAtTime.isEmpty()) {
+            System.out.println("⚠️ No mechanics available at " + scheduledTime);
+            return null;
+        }
+
+        // Sort by workload (least busy first)
+        User selectedMechanic = availableAtTime.stream()
+                .min(Comparator.comparingLong(m -> workloadMap.getOrDefault(m.getId(), 0L)))
+                .orElse(null);
+
+        if (selectedMechanic != null) {
+            long workload = workloadMap.getOrDefault(selectedMechanic.getId(), 0L);
+            System.out.println("🎯 Selected mechanic: " + selectedMechanic.getFullName() +
+                    " (Current workload: " + workload + " active bookings)");
+        }
+
+        return selectedMechanic;
+    }
+
+    // ✅ DEPRECATED: Keep for backward compatibility but use autoAssignMechanicSmart instead
+    @Deprecated
+    public User autoAssignMechanic(LocalDateTime scheduledTime, Integer durationMinutes) {
+        return autoAssignMechanicSmart(scheduledTime, durationMinutes);
+    }
+
+    // ✅ NEW: Get mechanic workload for display
+    public Map<Long, Long> getMechanicWorkloadMap() {
+        List<Object[]> workloadData = serviceBookingRepository.findMechanicWorkload();
+        return workloadData.stream()
+                .collect(Collectors.toMap(
+                        arr -> ((User) arr[0]).getId(),
+                        arr -> (Long) arr[1]
+                ));
     }
 
     private LocalDateTime parseScheduledDateTime(String date, String time) {
@@ -328,7 +413,7 @@ public class ServiceBookingService {
     private boolean isValidStatusTransition(BookingStatus currentStatus, BookingStatus newStatus) {
         switch (currentStatus) {
             case PENDING:
-                return Arrays.asList(BookingStatus.CONFIRMED, BookingStatus.CANCELLED).contains(newStatus);
+                return Arrays.asList(BookingStatus.CONFIRMED, BookingStatus.ASSIGNED, BookingStatus.CANCELLED).contains(newStatus);
             case CONFIRMED:
                 return Arrays.asList(BookingStatus.ASSIGNED, BookingStatus.CANCELLED, BookingStatus.NO_SHOW).contains(newStatus);
             case ASSIGNED:
